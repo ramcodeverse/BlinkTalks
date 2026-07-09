@@ -12,8 +12,8 @@ import { seedDatabase } from "./server/seed.ts";
 import apiRoutes from "./server/routes.ts";
 import { setupWebSocketServer } from "./server/websocket.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = typeof __filename !== "undefined" ? __filename : (import.meta && import.meta.url ? fileURLToPath(import.meta.url) : "");
+const _dirname = typeof __dirname !== "undefined" ? __dirname : path.dirname(_filename);
 
 async function startServer() {
   const app = express();
