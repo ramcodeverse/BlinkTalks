@@ -1,0 +1,6 @@
+{
+  "name": "BlinkTalks",
+  "description": "A portfolio-grade, production-quality real-time chat application modeled on Telegram's identity and discovery model.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

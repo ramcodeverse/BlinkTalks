@@ -1,0 +1,95 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  username      String    @unique
+  password_hash String
+  display_name  String
+  avatar        String?
+  bio           String?
+  role          String    @default("user") // "user" | "admin"
+  is_suspended  Boolean   @default(false)
+  created_at    DateTime  @default(now())
+
+  // Relations
+  memberships   ConversationMember[]
+  messages      Message[]
+  auditLogsSent AdminAuditLog[]      @relation("AdminUser")
+  auditLogsRecv AdminAuditLog[]      @relation("TargetUser")
+
+  // Simple Contacts modeling: Owner of a contact entry, and the contact user
+  contactsOwned Contact[]            @relation("ContactOwner")
+  contactsAs    Contact[]            @relation("ContactUser")
+}
+
+model Contact {
+  owner_user_id   String
+  contact_user_id String
+  created_at      DateTime @default(now())
+
+  owner   User @relation("ContactOwner", fields: [owner_user_id], references: [id], onDelete: Cascade)
+  contact User @relation("ContactUser", fields: [contact_user_id], references: [id], onDelete: Cascade)
+
+  @@id([owner_user_id, contact_user_id])
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  type        String   // "direct" | "group"
+  name        String?  // null for direct chats
+  is_public   Boolean  @default(false) // only meaningful for groups
+  invite_code String?  @unique // unique invite code for private groups
+  created_at  DateTime @default(now())
+
+  // Relations
+  members  ConversationMember[]
+  messages Message[]
+}
+
+model ConversationMember {
+  conversation_id      String
+  user_id              String
+  role                 String   @default("member") // "member" | "admin"
+  last_read_message_id String?
+  joined_at            DateTime @default(now())
+  is_accepted          Boolean  @default(true)
+  is_blocked           Boolean  @default(false)
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([conversation_id, user_id])
+}
+
+model Message {
+  id              String    @id @default(uuid())
+  conversation_id String
+  sender_id       String
+  content         String    // Encrypted via AES-256-GCM
+  created_at      DateTime  @default(now())
+  edited_at       DateTime?
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, created_at])
+}
+
+model AdminAuditLog {
+  id             String   @id @default(uuid())
+  admin_user_id  String
+  action         String   // "suspend" | "reinstate" | "delete" | "role_change" | "password_reset" | "group_unlist" | "group_delete"
+  target_user_id String?
+  details        String
+  created_at     DateTime @default(now())
+
+  admin  User  @relation("AdminUser", fields: [admin_user_id], references: [id], onDelete: Cascade)
+  target User? @relation("TargetUser", fields: [target_user_id], references: [id], onDelete: SetNull)
+}

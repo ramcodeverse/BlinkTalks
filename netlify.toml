@@ -1,0 +1,11 @@
+[build]
+  # Build only the client-side bundle for Netlify deployments
+  command = "npm run build:client"
+  publish = "dist"
+
+# Single Page Application (SPA) Routing Rule
+# Redirects all frontend traffic to index.html so that client-side routers (e.g., React Router) handle URL paths.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
