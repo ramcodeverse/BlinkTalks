@@ -683,7 +683,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ connectionStatus: "reconnecting" });
 
     // Derive protocol and host (wss:// if secure context, ws:// otherwise)
-    const apiBase = API_BASE;
+    const hostname = window.location.hostname;
+    const isNetlify = hostname.endsWith(".netlify.app");
+    const apiBase = API_BASE || (isNetlify ? (isDevEnv() ? DEV_BACKEND : PRE_BACKEND) : "");
     let wsUrl;
     if (apiBase) {
       const wsProtocol = apiBase.startsWith("https:") ? "wss:" : "ws:";
