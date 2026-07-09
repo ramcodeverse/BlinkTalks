@@ -9,6 +9,7 @@ export default function AuthScreen() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
 
   // Username availability check states
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -16,6 +17,53 @@ export default function AuthScreen() {
   const usernameCheckTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const { login, signup } = useChatStore();
+
+  // Helper to find a verified unique, available username
+  const findAvailableUsername = async (base: string) => {
+    if (base.length < 3) return;
+    let currentSuggestion = base;
+    let isAvailable = false;
+    let attempts = 0;
+    
+    while (!isAvailable && attempts < 10) {
+      try {
+        const res = await fetch(`${API_BASE}/api/users/check-username?q=${encodeURIComponent(currentSuggestion)}`);
+        if (res.ok) {
+          const data = await safeParseJson(res);
+          if (data.available) {
+            isAvailable = true;
+            break;
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+      attempts++;
+      const randomNum = Math.floor(100 + Math.random() * 900);
+      currentSuggestion = `${base}_${randomNum}`.slice(0, 20);
+    }
+    
+    if (isAvailable) {
+      setUsername(currentSuggestion);
+      setUsernameAvailable(true);
+    }
+  };
+
+  // Auto-generate username from Display Name
+  useEffect(() => {
+    if (!isLogin && !isUsernameManuallyEdited) {
+      const clean = displayName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "")
+        .slice(0, 20);
+      if (clean.length >= 1) {
+        setUsername(clean);
+      } else {
+        setUsername("");
+      }
+    }
+  }, [displayName, isLogin, isUsernameManuallyEdited]);
 
   // Debounced username checking pipeline
   useEffect(() => {
@@ -41,6 +89,10 @@ export default function AuthScreen() {
         if (res.ok) {
           const data = await safeParseJson(res);
           setUsernameAvailable(data.available);
+
+          if (data.available === false && !isUsernameManuallyEdited) {
+            await findAvailableUsername(clean);
+          }
         } else {
           setUsernameAvailable(null);
         }
@@ -54,7 +106,7 @@ export default function AuthScreen() {
     return () => {
       if (usernameCheckTimeout.current) clearTimeout(usernameCheckTimeout.current);
     };
-  }, [username, isLogin]);
+  }, [username, isLogin, isUsernameManuallyEdited]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +194,10 @@ export default function AuthScreen() {
                   type="text"
                   required
                   value={username}
-                  onChange={(e) => setUsername(e.target.value.trim())}
+                  onChange={(e) => {
+                    setUsername(e.target.value.trim());
+                    setIsUsernameManuallyEdited(true);
+                  }}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950 py-3 pr-4 pl-10 text-sm text-white placeholder-slate-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   placeholder="Admin"
                 />
@@ -201,6 +256,10 @@ export default function AuthScreen() {
             onClick={() => {
               setIsLogin(!isLogin);
               setError(null);
+              setIsUsernameManuallyEdited(false);
+              setUsername("");
+              setDisplayName("");
+              setPassword("");
             }}
             className="text-sm font-medium text-brand-500 hover:text-brand-400 cursor-pointer"
           >
