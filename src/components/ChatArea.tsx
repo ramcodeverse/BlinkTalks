@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useChatStore } from "../store/chatStore.ts";
+import { useChatStore, API_BASE } from "../store/chatStore.ts";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Send,
@@ -497,7 +497,7 @@ export default function ChatArea() {
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem("tg_token");
-                    const res = await fetch(`/api/conversations/${activeConv.id}/accept`, {
+                    const res = await fetch(`${API_BASE}/api/conversations/${activeConv.id}/accept`, {
                       method: "POST",
                       headers: { Authorization: `Bearer ${token}` },
                     });
@@ -516,7 +516,7 @@ export default function ChatArea() {
                 onClick={async () => {
                   try {
                     const token = localStorage.getItem("tg_token");
-                    const res = await fetch(`/api/conversations/${activeConv.id}/block`, {
+                    const res = await fetch(`${API_BASE}/api/conversations/${activeConv.id}/block`, {
                       method: "POST",
                       headers: { Authorization: `Bearer ${token}` },
                     });

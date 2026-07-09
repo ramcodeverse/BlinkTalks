@@ -67,7 +67,8 @@ async function startServer() {
   setupWebSocketServer(httpServer);
 
   // Integrate Vite dev server for client-side loading or serve built assets in production
-  if (process.env.NODE_ENV !== "production") {
+  const isProduction = process.env.NODE_ENV === "production" || _filename.endsWith(".cjs") || _filename.includes("dist");
+  if (!isProduction) {
     console.log("⚙️ Starting in DEVELOPMENT mode. Mounting Vite Dev middleware...");
     const vite = await createViteServer({
       server: { middlewareMode: true },

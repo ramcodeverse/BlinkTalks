@@ -75,7 +75,8 @@ function isDevEnv() {
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
     hostname.includes("-dev") ||
-    hostname.includes("ais-dev")
+    hostname.includes("ais-dev") ||
+    !!import.meta.env.DEV
   );
 }
 
@@ -84,17 +85,21 @@ function getApiBase() {
   if (envUrl) return envUrl.replace(/\/$/, "");
 
   const hostname = window.location.hostname;
-  // If running on localhost, 127.0.0.1, or directly on the Cloud Run container itself,
-  // we can use relative paths "" so it connects to the local co-located server.
+  // If running on localhost, 127.0.0.1, on Netlify (which has backend proxying configured),
+  // or directly on the Cloud Run container/preview iframe itself,
+  // we can use relative paths "" so it connects to the local or proxied co-located server.
   if (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
-    hostname.endsWith(".run.app")
+    hostname.endsWith(".run.app") ||
+    hostname.endsWith(".netlify.app") ||
+    hostname.includes("googleusercontent.com") ||
+    hostname.includes("google.com")
   ) {
     return "";
   }
 
-  // Otherwise, we are on a proxy or external host (like Netlify or ais-preview.google.com),
+  // Otherwise, we are on a proxy or external host (like Netlify),
   // so we use the absolute Cloud Run backend URL.
   return isDevEnv() ? DEV_BACKEND : PRE_BACKEND;
 }
