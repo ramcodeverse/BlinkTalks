@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useChatStore } from "./store/chatStore.ts";
+import { useChatStore, API_BASE } from "./store/chatStore.ts";
 import AuthScreen from "./components/AuthScreen.tsx";
 import Sidebar from "./components/Sidebar.tsx";
 import ChatArea from "./components/ChatArea.tsx";
@@ -24,7 +24,7 @@ export default function App() {
 
   const checkMaintenance = async () => {
     try {
-      const res = await fetch("/api/maintenance/status");
+      const res = await fetch(`${API_BASE}/api/maintenance/status`);
       if (res.ok) {
         const data = await res.json();
         setMaintenance(data);

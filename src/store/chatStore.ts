@@ -66,7 +66,23 @@ interface ChatState {
   handleSocketIncoming: (event: MessageEvent) => void;
 }
 
-export const API_BASE = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+const BACKEND_FALLBACK = "https://ais-pre-qssxoo2vmqcb6brvxriblu-721377060812.asia-southeast1.run.app";
+
+function getApiBase() {
+  const envUrl = (import.meta.env.VITE_API_URL || "").trim();
+  if (envUrl) return envUrl.replace(/\/$/, "");
+
+  const hostname = window.location.hostname;
+  // If running on local development, or inside the cloud run container environment (*.run.app)
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".run.app")) {
+    return "";
+  }
+  
+  // Otherwise, if deployed on external hosting (e.g. Netlify), point to the production backend
+  return BACKEND_FALLBACK;
+}
+
+export const API_BASE = getApiBase();
 
 export async function safeParseJson(res: Response) {
   const contentType = res.headers.get("content-type") || "";
