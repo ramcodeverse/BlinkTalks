@@ -4,14 +4,12 @@
   publish = "dist"
 
 # OPTION 1: Netlify API Proxying (Recommended for regular API requests)
-# To use this, uncomment the lines below and replace "https://your-backend.com" with your actual hosted Express API URL.
 # This avoids any CORS issues and routes all /api/... calls straight to your server.
-#
-# [[redirects]]
-#   from = "/api/*"
-#   to = "https://your-backend.com/api/:splat"
-#   status = 200
-#   force = true
+[[redirects]]
+  from = "/api/*"
+  to = "https://ais-pre-qssxoo2vmqcb6brvxriblu-721377060812.asia-southeast1.run.app/api/:splat"
+  status = 200
+  force = true
 
 # Single Page Application (SPA) Routing Rule
 # Redirects all other frontend traffic to index.html so client-side React handles routing.

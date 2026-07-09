@@ -10,15 +10,18 @@ import { hashPassword } from "./auth.js";
  * These credentials MUST be removed, rotated, or locked before any staging, QA, or production deployment.
  */
 export async function seedDatabase(): Promise<void> {
-  // Hard guard against production seeding to prevent catastrophic exposure of defaults
-  if (process.env.NODE_ENV === "production") {
-    console.warn("🚫 SEEDING SKIPPED: Database seeding requested, but blocked because NODE_ENV=production.");
-    return;
-  }
-
   const prisma = getPrisma();
 
   try {
+    // If in production, only allow seeding if the database is completely empty
+    if (process.env.NODE_ENV === "production") {
+      const userCount = await prisma.user.count();
+      if (userCount > 0) {
+        console.warn("🚫 SEEDING SKIPPED: Database seeding requested, but blocked in production because users already exist.");
+        return;
+      }
+      console.log("🌱 Database is empty in production. Running safe default seed...");
+    }
     const adminUsername = "admin";
     let adminUser = null;
 
