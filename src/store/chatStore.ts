@@ -121,6 +121,19 @@ export async function safeParseJson(res: Response) {
   }
 }
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    if (typeof payload.exp !== "number") return false;
+    // Buffer of 15 seconds to avoid handshake race conditions
+    return (payload.exp * 1000) - 15000 < Date.now();
+  } catch (err) {
+    return true;
+  }
+}
+
 export const useChatStore = create<ChatState>((set, get) => ({
   user: null,
   token: null,
@@ -646,9 +659,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  connectSocket: () => {
-    const token = get().token;
+  connectSocket: async () => {
+    let token = get().token;
     if (!token || get().socket) return;
+
+    // Refresh token proactively if it is expired or close to expiring
+    if (isTokenExpired(token) && get().refreshToken) {
+      console.log("🔌 WS Handshake: Access token is expired/expiring. Refreshing session...");
+      const success = await get().refreshSession();
+      if (!success) {
+        console.error("🔌 WS Handshake: Token refresh failed. Terminating socket connection attempt.");
+        return;
+      }
+      token = get().token;
+      if (!token) return;
+    }
 
     set({ connectionStatus: "reconnecting" });
 

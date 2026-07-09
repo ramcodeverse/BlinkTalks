@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import { execSync } from "child_process";
 
 // Load Environment Variables
 dotenv.config();
@@ -35,6 +36,15 @@ async function startServer() {
     }
     next();
   });
+
+  // Ensure Database Schema is Migrated and up to date
+  try {
+    console.log("⚙️ Ensuring database schema is synchronized...");
+    execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
+    console.log("✅ Database schema is synchronized successfully.");
+  } catch (err) {
+    console.error("🔴 Failed to push database schema on startup:", err);
+  }
 
   // Run Developer DB Seed
   try {
