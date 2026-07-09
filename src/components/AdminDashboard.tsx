@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useChatStore } from "../store/chatStore.ts";
+import { useChatStore, API_BASE, safeParseJson } from "../store/chatStore.ts";
 import {
   ShieldAlert,
   Users,
@@ -73,9 +73,9 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   // Fetch current maintenance status
   const fetchMaintStatus = async () => {
     try {
-      const res = await fetch("/api/maintenance/status");
+      const res = await fetch(`${API_BASE}/api/maintenance/status`);
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setMaintActive(data.active);
         setMaintTime(data.endTime || "");
       }
@@ -87,7 +87,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   const handleSaveMaintenance = async () => {
     setMaintLoading(true);
     try {
-      const res = await fetch("/api/maintenance/toggle", {
+      const res = await fetch(`${API_BASE}/api/maintenance/toggle`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,7 +101,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
       if (res.ok) {
         alert("Maintenance settings updated successfully!");
       } else {
-        const errData = await res.json();
+        const errData = await safeParseJson(res);
         alert(`Error: ${errData.error || "Failed to save"}`);
       }
     } catch (err) {
@@ -115,11 +115,11 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   // Load Overview Metrics
   const loadOverview = async () => {
     try {
-      const res = await fetch("/api/admin/overview", {
+      const res = await fetch(`${API_BASE}/api/admin/overview`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setMetrics(data.metrics);
         setSignupsOverTime(data.signupsOverTime || []);
         setMessagesOverTime(data.messagesOverTime || []);
@@ -140,11 +140,11 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
         limit: userLimit.toString(),
         skip: userSkip.toString(),
       });
-      const res = await fetch(`/api/admin/users?${query}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/api/admin/users?${query}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setUsers(data.users);
         setTotalUsers(data.total);
       }
@@ -156,11 +156,11 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   // Load Public Groups Oversight
   const loadGroups = async () => {
     try {
-      const res = await fetch("/api/admin/groups", {
+      const res = await fetch(`${API_BASE}/api/admin/groups`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setGroups(data.groups);
       }
     } catch (err) {
@@ -171,11 +171,11 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   // Load Audit Trail Logs
   const loadAuditLogs = async () => {
     try {
-      const res = await fetch("/api/admin/audit", {
+      const res = await fetch(`${API_BASE}/api/admin/audit`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setAuditLogs(data.logs);
       }
     } catch (err) {
@@ -198,11 +198,11 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
     setTempPassword(null);
     setShowDeleteConfirm(false);
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setSelectedUser(data);
       }
     } catch (err) {
@@ -215,7 +215,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   // Admin Actions
   const handleSuspendToggle = async (userId: string, isCurrentlySuspended: boolean) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/suspend`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}/suspend`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -238,7 +238,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
   const handleRoleToggle = async (userId: string, currentRole: string) => {
     const nextRole = currentRole === "admin" ? "user" : "admin";
     try {
-      const res = await fetch(`/api/admin/users/${userId}/role`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}/role`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -258,12 +258,12 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   const handleResetPassword = async (userId: string) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/reset-password`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}/reset-password`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         setTempPassword(data.tempPassword);
         await loadAuditLogs();
       }
@@ -274,7 +274,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   const handleSoftDelete = async (userId: string) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}/delete`, {
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}/delete`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -291,7 +291,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   const handleGroupUnlistToggle = async (groupId: string, isCurrentlyPublic: boolean) => {
     try {
-      const res = await fetch(`/api/admin/groups/${groupId}/unlist`, {
+      const res = await fetch(`${API_BASE}/api/admin/groups/${groupId}/unlist`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -310,7 +310,7 @@ export default function AdminDashboard({ onClose }: AdminDashboardProps) {
 
   const handleGroupDelete = async (groupId: string) => {
     try {
-      const res = await fetch(`/api/admin/groups/${groupId}`, {
+      const res = await fetch(`${API_BASE}/api/admin/groups/${groupId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

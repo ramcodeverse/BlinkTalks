@@ -66,7 +66,27 @@ interface ChatState {
   handleSocketIncoming: (event: MessageEvent) => void;
 }
 
-const API_BASE = "";
+export const API_BASE = (import.meta.env.VITE_API_URL || "").trim().replace(/\/$/, "");
+
+export async function safeParseJson(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("text/html")) {
+    throw new Error(
+      `The server returned an HTML page instead of JSON (Status ${res.status}). This often means the backend API URL is incorrect, down, or blocked by a proxy.`
+    );
+  }
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+      throw new Error(
+        `The server returned an HTML page (Status ${res.status}). Please check that your VITE_API_URL environment variable is correct and that the backend server is running.`
+      );
+    }
+    throw new Error(`Failed to parse response as JSON (Status ${res.status}): ${text.slice(0, 100)}`);
+  }
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   user: null,
@@ -110,7 +130,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         set({ user: data.user, connectionStatus: "offline" });
         get().connectSocket();
         get().fetchConversations();
@@ -139,7 +159,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         const token = data.token;
         localStorage.setItem("tg_token", token);
         set({ token });
@@ -149,7 +169,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           headers: { Authorization: `Bearer ${token}` },
         });
         if (meRes.ok) {
-          const meData = await meRes.json();
+          const meData = await safeParseJson(meRes);
           set({ user: meData.user });
           get().connectSocket();
           get().fetchConversations();
@@ -171,7 +191,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ username, password }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || "Login failed");
     }
@@ -189,7 +209,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ username, password, display_name: displayName }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || "Signup failed");
     }
@@ -231,7 +251,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ display_name: displayName, bio }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || "Failed to update profile");
     }
@@ -249,7 +269,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     if (!res.ok) {
-      const data = await res.json();
+      const data = await safeParseJson(res);
       throw new Error(data.error || "Failed to leave group");
     }
 
@@ -269,7 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     if (!res.ok) {
-      const data = await res.json();
+      const data = await safeParseJson(res);
       throw new Error(data.error || "Failed to delete group");
     }
 
@@ -292,7 +312,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ name }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || "Failed to rename group");
     }
@@ -336,7 +356,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         set({ conversations: data.conversations });
       }
     } catch (err) {
@@ -357,7 +377,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ targetUserId }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.error || "Failed to start direct chat");
 
     // Prepend or switch to it
@@ -385,7 +405,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       body: JSON.stringify({ name, is_public: isPublic }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.error || "Failed to create group");
 
     set({ conversations: [data, ...get().conversations] });
@@ -402,7 +422,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.error || "Failed to join group");
 
     await get().fetchConversations();
@@ -424,7 +444,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         
         set((state) => {
           const existing = state.messages[conversationId] || [];
@@ -471,7 +491,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeParseJson(res);
         set({ contacts: data.contacts });
       }
     } catch (err) {
@@ -581,7 +601,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     if (!res.ok) {
-      const data = await res.json();
+      const data = await safeParseJson(res);
       throw new Error(data.error || "Failed to delete message");
     }
   },

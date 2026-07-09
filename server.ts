@@ -22,6 +22,20 @@ async function startServer() {
   // JSON Body Parser
   app.use(express.json());
 
+  // Custom CORS middleware for headless frontend compatibility (e.g., Netlify)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin || "*";
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    if (req.method === "OPTIONS") {
+      res.sendStatus(200);
+      return;
+    }
+    next();
+  });
+
   // Run Developer DB Seed
   try {
     await seedDatabase();

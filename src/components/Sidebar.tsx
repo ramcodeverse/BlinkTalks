@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useChatStore } from "../store/chatStore.ts";
+import { useChatStore, API_BASE, safeParseJson } from "../store/chatStore.ts";
 import {
   Search,
   Plus,
@@ -62,11 +62,11 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
     const delayDebounce = setTimeout(async () => {
       try {
         const token = localStorage.getItem("tg_token");
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
+        const res = await fetch(`${API_BASE}/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeParseJson(res);
           setSearchResults(data);
         }
       } catch (err) {

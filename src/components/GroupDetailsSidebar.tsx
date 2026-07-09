@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useChatStore } from "../store/chatStore.ts";
+import { useChatStore, API_BASE, safeParseJson } from "../store/chatStore.ts";
 import { 
   X, 
   Users, 
@@ -46,10 +46,10 @@ export default function GroupDetailsSidebar({ conversation, onClose }: GroupDeta
       setLoadingMembers(true);
       setError(null);
       try {
-        const res = await fetch(`/api/conversations/${conversation.id}/members`, {
+        const res = await fetch(`${API_BASE}/api/conversations/${conversation.id}/members`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
+        const data = await safeParseJson(res);
         if (!res.ok) throw new Error(data.error || "Failed to load group members.");
         if (active) {
           setMembers(data.members || []);
@@ -76,11 +76,11 @@ export default function GroupDetailsSidebar({ conversation, onClose }: GroupDeta
     if (!token) return;
     setError(null);
     try {
-      const res = await fetch(`/api/conversations/${conversation.id}/members/${memberId}/remove`, {
+      const res = await fetch(`${API_BASE}/api/conversations/${conversation.id}/members/${memberId}/remove`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      const data = await safeParseJson(res);
       if (!res.ok) throw new Error(data.error || "Failed to remove member.");
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
     } catch (err: any) {

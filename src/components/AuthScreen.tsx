@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useChatStore } from "../store/chatStore.ts";
+import { useChatStore, API_BASE, safeParseJson } from "../store/chatStore.ts";
 import { Shield, Key, AtSign, User, Activity } from "lucide-react";
 
 export default function AuthScreen() {
@@ -37,9 +37,9 @@ export default function AuthScreen() {
     setCheckingUsername(true);
     usernameCheckTimeout.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/users/check-username?q=${encodeURIComponent(clean)}`);
+        const res = await fetch(`${API_BASE}/api/users/check-username?q=${encodeURIComponent(clean)}`);
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeParseJson(res);
           setUsernameAvailable(data.available);
         } else {
           setUsernameAvailable(null);
