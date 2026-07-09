@@ -66,20 +66,37 @@ interface ChatState {
   handleSocketIncoming: (event: MessageEvent) => void;
 }
 
-const BACKEND_FALLBACK = "https://ais-pre-qssxoo2vmqcb6brvxriblu-721377060812.asia-southeast1.run.app";
+const DEV_BACKEND = "https://ais-dev-qssxoo2vmqcb6brvxriblu-721377060812.asia-southeast1.run.app";
+const PRE_BACKEND = "https://ais-pre-qssxoo2vmqcb6brvxriblu-721377060812.asia-southeast1.run.app";
+
+function isDevEnv() {
+  const hostname = window.location.hostname;
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.includes("-dev") ||
+    hostname.includes("ais-dev")
+  );
+}
 
 function getApiBase() {
   const envUrl = (import.meta.env.VITE_API_URL || "").trim();
   if (envUrl) return envUrl.replace(/\/$/, "");
 
   const hostname = window.location.hostname;
-  // If running on local development, or inside the cloud run container environment (*.run.app)
-  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".run.app")) {
+  // If running on localhost, 127.0.0.1, or directly on the Cloud Run container itself,
+  // we can use relative paths "" so it connects to the local co-located server.
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".run.app")
+  ) {
     return "";
   }
-  
-  // Otherwise, if deployed on external hosting (e.g. Netlify), point to the production backend
-  return BACKEND_FALLBACK;
+
+  // Otherwise, we are on a proxy or external host (like Netlify or ais-preview.google.com),
+  // so we use the absolute Cloud Run backend URL.
+  return isDevEnv() ? DEV_BACKEND : PRE_BACKEND;
 }
 
 export const API_BASE = getApiBase();
@@ -636,16 +653,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ connectionStatus: "reconnecting" });
 
     // Derive protocol and host (wss:// if secure context, ws:// otherwise)
-    const apiBase = (import.meta.env.VITE_API_URL || "").trim();
+    const apiBase = API_BASE;
     let wsUrl;
     if (apiBase) {
       const wsProtocol = apiBase.startsWith("https:") ? "wss:" : "ws:";
       const host = apiBase.replace(/^https?:\/\//, "");
       const cleanHost = host.endsWith("/") ? host.slice(0, -1) : host;
-      wsUrl = `${wsProtocol}//${cleanHost}/?token=${token}`;
+      wsUrl = `${wsProtocol}//${cleanHost}/ws?token=${token}`;
     } else {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      wsUrl = `${protocol}//${window.location.host}/?token=${token}`;
+      wsUrl = `${protocol}//${window.location.host}/ws?token=${token}`;
     }
     
     console.log("🔌 Initializing WS Connection:", wsUrl);

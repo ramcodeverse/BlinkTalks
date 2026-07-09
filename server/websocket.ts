@@ -26,7 +26,13 @@ export function setupWebSocketServer(server: Server) {
 
   // Handle upgrade requests manually to verify authorization
   server.on("upgrade", (request, socket, head) => {
-    const { query } = url.parse(request.url || "", true);
+    const { pathname, query } = url.parse(request.url || "", true);
+
+    // ONLY intercept upgrades for our chat app websocket endpoint!
+    if (pathname !== "/ws") {
+      return; // Let other upgrade listeners (e.g. Vite dev server HMR) handle it
+    }
+
     const token = query.token as string;
 
     if (!token) {
@@ -78,32 +84,36 @@ export function setupWebSocketServer(server: Server) {
     const userId = ws.userId;
     const username = ws.username;
 
-    // Track socket for user
-    let sockets = userSockets.get(userId);
-    if (!sockets) {
-      sockets = new Set();
-      userSockets.set(userId, sockets);
+    try {
+      // Track socket for user
+      let sockets = userSockets.get(userId);
+      if (!sockets) {
+        sockets = new Set();
+        userSockets.set(userId, sockets);
+      }
+      sockets.add(ws);
+
+      console.log(`🔌 WebSocket Connected: @${username} (${sockets.size} active sessions)`);
+
+      // Handle Presence Online
+      const isFirstConnection = sockets.size === 1;
+      if (isFirstConnection) {
+        presenceManager.setPresence(userId, true);
+        broadcastPresence(userId, true);
+      }
+
+      // Subscribe user socket to all of their current conversation channels
+      await subscribeUserToConversations(ws);
+
+      // Initial success handshake
+      sendWSMessage(ws, "auth_ack", {
+        userId,
+        username,
+        status: "connected",
+      });
+    } catch (err: any) {
+      console.error("Error in wss connection handler:", err);
     }
-    sockets.add(ws);
-
-    console.log(`🔌 WebSocket Connected: @${username} (${sockets.size} active sessions)`);
-
-    // Handle Presence Online
-    const isFirstConnection = sockets.size === 1;
-    if (isFirstConnection) {
-      presenceManager.setPresence(userId, true);
-      broadcastPresence(userId, true);
-    }
-
-    // Subscribe user socket to all of their current conversation channels
-    await subscribeUserToConversations(ws);
-
-    // Initial success handshake
-    sendWSMessage(ws, "auth_ack", {
-      userId,
-      username,
-      status: "connected",
-    });
 
     // Handle incoming frames
     ws.on("message", async (data) => {
