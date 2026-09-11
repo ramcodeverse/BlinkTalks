@@ -62,14 +62,3 @@ Collaborative documents require a Conflict-free Replicated Data Type (CRDT) to m
    npm run dev
    ```
    Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 🧪 Interview Q&A Cheatsheet (Defend Your Code)
-
-* **Q**: *Why did you pick native WebSockets over Socket.IO?*
-  **A**: Native WebSockets reduce bundle size and run directly on web standards. It allowed me to write custom heartbeat checks and a resilient resynchronization engine, proving I understand TCP upgrade handshakes rather than relying on library magic.
-* **Q**: *How do you handle connection drops?*
-  **A**: The client automatically detects WebSocket drops, shows "reconnecting", and initiates an exponential backoff loop. Upon reconnection, it queries the database for missed logs since the latest received message cursor, ensuring zero gaps and zero duplicates.
-* **Q**: *What happens when an admin deletes a user?*
-  **A**: To protect thread integrity, I designed a soft-delete/anonymization pattern. The user’s username is randomized and freed back into the system, passwords and tokens are destroyed, but the historic messages persist as "Deleted Account" so other participants don't see broken, one-sided conversations.
