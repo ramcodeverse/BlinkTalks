@@ -16,8 +16,10 @@ import { decrypt, encrypt } from "./encryption.js";
 import { searchLimiter, authLimiter } from "./limiter.js";
 import { UserRole } from "../shared/types.js";
 import { presenceManager, pubsub } from "./pubsub.js";
+import workspaceRoutes from "./workspaceRoutes.js";
 
 const router = Router();
+router.use(workspaceRoutes);
 
 // ==========================================
 // SYSTEM MAINTENANCE SYSTEM CONFIG
@@ -284,6 +286,39 @@ router.post("/api/auth/signup", async (req: AuthenticatedRequest, res: Response)
         role: "user",
       },
     });
+
+    // Auto-join default workspace if it exists
+    try {
+      const defaultWs = await prisma.workspace.findUnique({
+        where: { invite_code: "acme-workspace" },
+      });
+      if (defaultWs) {
+        await prisma.workspaceMember.create({
+          data: {
+            workspace_id: defaultWs.id,
+            user_id: user.id,
+            role: "member",
+            department: "General",
+          },
+        });
+        // Auto-join public channels
+        const publicChannels = await prisma.conversation.findMany({
+          where: { workspace_id: defaultWs.id, is_public: true },
+        });
+        for (const ch of publicChannels) {
+          await prisma.conversationMember.create({
+            data: {
+              conversation_id: ch.id,
+              user_id: user.id,
+              role: "member",
+              is_accepted: true,
+            },
+          });
+        }
+      }
+    } catch (wsJoinErr) {
+      console.error("Auto workspace join error on signup:", wsJoinErr);
+    }
 
     const accessToken = generateAccessToken(user.id, user.username, user.role);
     const refreshToken = generateRefreshToken(user.id);

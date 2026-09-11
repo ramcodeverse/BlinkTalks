@@ -19,9 +19,18 @@ import {
 interface SidebarProps {
   onOpenAdmin: () => void;
   onOpenSettings: () => void;
+  selectedTab?: "chats" | "groups" | "requests" | "contacts";
+  onSelectTab?: (tab: "chats" | "groups" | "requests" | "contacts") => void;
+  onOpenNewGroup?: () => void;
+  onOpenJoinGroup?: () => void;
 }
 
-export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
+export default function Sidebar({
+  onOpenAdmin,
+  onOpenSettings,
+  selectedTab,
+  onSelectTab,
+}: SidebarProps) {
   const {
     user,
     logout,
@@ -29,11 +38,11 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
     activeConversationId,
     setActiveConversation,
     typing,
+    presence,
     startDirectChat,
     createGroupChat,
     joinGroup,
     contacts,
-    addContact,
     removeContact,
     connectionStatus,
   } = useChatStore();
@@ -46,8 +55,12 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
   const [groupIsPublic, setGroupIsPublic] = useState(true);
   const [showJoinGroup, setShowJoinGroup] = useState(false);
   const [joinCode, setJoinCode] = useState("");
-  const [showContacts, setShowContacts] = [false, () => {}]; // legacy backup, to be removed shortly
-  const [activeTab, setActiveTab] = useState<"chats" | "requests" | "contacts">("chats");
+  const [internalTab, setInternalTab] = useState<"chats" | "groups" | "requests" | "contacts">("chats");
+  const activeTab = selectedTab || internalTab;
+  const setActiveTab = (tab: "chats" | "groups" | "requests" | "contacts") => {
+    setInternalTab(tab);
+    if (onSelectTab) onSelectTab(tab);
+  };
   const [error, setError] = useState<string | null>(null);
 
   // Debounced directory search pipeline
@@ -113,7 +126,12 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
   };
 
   return (
-    <div id="app-sidebar" className="flex h-full w-80 flex-col border-r border-slate-800 bg-slate-900 text-slate-100">
+    <div
+      id="app-sidebar"
+      className={`${
+        activeConversationId ? "hidden md:flex" : "flex"
+      } h-full w-full md:w-80 flex-col border-r border-slate-800 bg-slate-900 text-slate-100 shrink-0 select-none`}
+    >
       
       {/* 1. Header Profile Box */}
       <div className="flex items-center justify-between border-b border-slate-800 p-4">
@@ -238,7 +256,7 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
         )}
       </div>
 
-      {/* 4. Controls Tabs (Chats / Requests / Contacts) */}
+      {/* 4. Controls Tabs (Chats / Groups / Requests / Contacts) */}
       {(() => {
         const requestCount = conversations.filter((c) => c.is_accepted === false && !c.is_blocked).length;
         return (
@@ -249,10 +267,21 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                 setError(null);
               }}
               className={`flex-1 py-3 text-center cursor-pointer border-b transition ${
-                activeTab === "chats" ? "border-brand-500 text-brand-500 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
+                activeTab === "chats" ? "border-brand-500 text-brand-400 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >
-              Active Chats
+              Chats
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("groups");
+                setError(null);
+              }}
+              className={`flex-1 py-3 text-center cursor-pointer border-b transition ${
+                activeTab === "groups" ? "border-brand-500 text-brand-400 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Groups
             </button>
             <button
               onClick={() => {
@@ -260,12 +289,12 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                 setError(null);
               }}
               className={`flex-1 py-3 text-center cursor-pointer border-b transition relative ${
-                activeTab === "requests" ? "border-brand-500 text-brand-500 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
+                activeTab === "requests" ? "border-brand-500 text-brand-400 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >
               <span>Requests</span>
               {requestCount > 0 && (
-                <span className="absolute top-2 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-slate-950 animate-pulse">
+                <span className="absolute top-2 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold text-slate-950 animate-pulse">
                   {requestCount}
                 </span>
               )}
@@ -276,7 +305,7 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                 setError(null);
               }}
               className={`flex-1 py-3 text-center cursor-pointer border-b transition ${
-                activeTab === "contacts" ? "border-brand-500 text-brand-500 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
+                activeTab === "contacts" ? "border-brand-500 text-brand-400 bg-slate-900" : "border-transparent text-slate-400 hover:text-slate-200"
               }`}
             >
               Contacts
@@ -296,7 +325,7 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
         {activeTab === "contacts" ? (
           /* Contacts rendering */
           <div className="space-y-1">
-            <span className="text-[10px] font-semibold text-slate-500 uppercase px-2 block mb-2">Saved Directory Cards</span>
+            <span className="text-[10px] font-semibold text-slate-500 uppercase px-2 block mb-2">Saved Directory Contacts</span>
             {contacts.length === 0 ? (
               <p className="text-center text-xs text-slate-500 py-6">No saved contacts yet. Search for people above to start.</p>
             ) : (
@@ -312,8 +341,13 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                     }}
                     className="flex items-center space-x-3 cursor-pointer min-w-0 flex-1 text-left"
                   >
-                    <div className="h-8 w-8 rounded-lg bg-slate-700 flex items-center justify-center font-bold text-slate-200 text-xs">
-                      {c.display_name.charAt(0).toUpperCase()}
+                    <div className="relative">
+                      <div className="h-8 w-8 rounded-lg bg-slate-700 flex items-center justify-center font-bold text-slate-200 text-xs">
+                        {c.display_name.charAt(0).toUpperCase()}
+                      </div>
+                      {presence[c.id]?.isOnline && (
+                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-white truncate">{c.display_name}</p>
@@ -339,6 +373,9 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                 if (activeTab === "requests") {
                   return c.is_accepted === false && !c.is_blocked;
                 }
+                if (activeTab === "groups") {
+                  return c.type === "group" && c.is_accepted !== false && !c.is_blocked;
+                }
                 // default is chats
                 return c.is_accepted !== false && !c.is_blocked;
               });
@@ -350,6 +387,16 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                       <p className="text-xs text-slate-500">No pending requests.</p>
                       <p className="text-[11px] text-slate-600 px-4">
                         When someone outside your contacts messages you, it appears here.
+                      </p>
+                    </div>
+                  );
+                }
+                if (activeTab === "groups") {
+                  return (
+                    <div className="text-center py-10 space-y-2">
+                      <p className="text-xs text-slate-500">No group channels joined.</p>
+                      <p className="text-[11px] text-slate-600 px-4">
+                        Click "New Group" below to create one or enter an invite code to join.
                       </p>
                     </div>
                   );
@@ -367,6 +414,7 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
               return filteredConversations.map((c) => {
                 const isActive = c.id === activeConversationId;
                 const typingUsers = typing[c.id] || [];
+                const isOtherUserOnline = c.type === "direct" && c.other_user ? presence[c.other_user.id]?.isOnline : false;
                 
                 return (
                   <button
@@ -377,10 +425,15 @@ export default function Sidebar({ onOpenAdmin, onOpenSettings }: SidebarProps) {
                     }`}
                   >
                     <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-display font-bold text-sm ${
-                        isActive ? "bg-white/20 text-white" : "bg-slate-800 text-slate-300 border border-slate-700/50"
-                      }`}>
-                        {c.type === "group" ? <Users className="h-5 w-5" /> : c.name?.charAt(0).toUpperCase()}
+                      <div className="relative">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-display font-bold text-sm ${
+                          isActive ? "bg-white/20 text-white" : "bg-slate-800 text-slate-300 border border-slate-700/50"
+                        }`}>
+                          {c.type === "group" ? <Users className="h-5 w-5" /> : c.name?.charAt(0).toUpperCase()}
+                        </div>
+                        {isOtherUserOnline && (
+                          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-slate-900" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center space-x-1">

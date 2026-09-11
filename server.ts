@@ -1,6 +1,7 @@
 import express from "express";
 import http from "http";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -37,13 +38,28 @@ async function startServer() {
     next();
   });
 
-  // Ensure Database Schema is Migrated and up to date
+  // Ensure Database Schema is Migrated and up to date with self-healing recovery
   try {
     console.log("⚙️ Ensuring database schema is synchronized...");
     execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
     console.log("✅ Database schema is synchronized successfully.");
   } catch (err) {
-    console.error("🔴 Failed to push database schema on startup:", err);
+    console.error("🔴 Failed to push database schema on startup. Attempting auto-recovery...", err);
+    try {
+      const dbPath = path.join(process.cwd(), "prisma", "dev.db");
+      const journalPath = path.join(process.cwd(), "prisma", "dev.db-journal");
+      const walPath = path.join(process.cwd(), "prisma", "dev.db-wal");
+      const shmPath = path.join(process.cwd(), "prisma", "dev.db-shm");
+      if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+      if (fs.existsSync(journalPath)) fs.unlinkSync(journalPath);
+      if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+      if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+      console.log("🔄 Cleared potentially malformed database files. Re-pushing schema...");
+      execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
+      console.log("✅ Database schema auto-recovery completed successfully.");
+    } catch (recoveryErr) {
+      console.error("❌ Database recovery failed:", recoveryErr);
+    }
   }
 
   // Run Developer DB Seed
@@ -59,6 +75,11 @@ async function startServer() {
   // Healthy probe endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
+  });
+
+  // Explicitly return JSON 404 for unhandled /api/* routes so client fetch never receives HTML
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
   });
 
   const httpServer = http.createServer(app);

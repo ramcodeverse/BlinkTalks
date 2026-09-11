@@ -42,14 +42,156 @@
   background: #475569;
 }
 
-/* Page transitions and animations */
+/* Global Motion Timings and Tokens */
+:root {
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-medium: 220ms;
+  --motion-slow: 280ms;
+  --ease-out-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+}
+
+/* Page transitions and subtle animations */
 @keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromBottom {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toastEnter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes toastExit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes messageHighlight {
+  0% { background-color: rgba(59, 130, 246, 0.35); }
+  70% { background-color: rgba(59, 130, 246, 0.12); }
+  100% { background-color: transparent; }
+}
+
+@keyframes pulseOnce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 .animate-fade-in {
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn var(--motion-normal) var(--ease-out-smooth) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown var(--motion-normal) var(--ease-out-smooth) forwards;
+}
+
+.animate-slide-right {
+  animation: slideRight var(--motion-normal) var(--ease-out-smooth) forwards;
+}
+
+.animate-panel-right {
+  animation: slideInFromRight var(--motion-medium) var(--ease-out-smooth) forwards;
+}
+
+.animate-bottom-sheet {
+  animation: slideInFromBottom var(--motion-medium) var(--ease-out-smooth) forwards;
+}
+
+.animate-scale-up {
+  animation: scaleUp var(--motion-fast) var(--ease-out-smooth) forwards;
+}
+
+.animate-toast-enter {
+  animation: toastEnter var(--motion-normal) var(--ease-out-smooth) forwards;
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 0.6s var(--ease-out-smooth) 1;
+}
+
+.highlight-target-message {
+  animation: messageHighlight 2.2s ease-out forwards;
+  border-radius: 0.75rem;
+}
+
+/* Button & Interactive micro-interactions */
+.btn-interactive {
+  transition: transform var(--motion-fast) var(--ease-out-smooth),
+              background-color var(--motion-fast) var(--ease-out-smooth),
+              border-color var(--motion-fast) var(--ease-out-smooth),
+              box-shadow var(--motion-fast) var(--ease-out-smooth),
+              opacity var(--motion-fast) var(--ease-out-smooth);
+}
+.btn-interactive:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.btn-interactive:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Card subtle lift */
+.card-hover-lift {
+  transition: transform var(--motion-normal) var(--ease-out-smooth),
+              box-shadow var(--motion-normal) var(--ease-out-smooth),
+              border-color var(--motion-normal) var(--ease-out-smooth);
+}
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+}
+
+/* Checkbox smooth check animation */
+.task-checkbox-check {
+  transition: transform var(--motion-fast) var(--ease-spring),
+              background-color var(--motion-fast) var(--ease-out-smooth),
+              border-color var(--motion-fast) var(--ease-out-smooth);
+}
+.task-checkbox-check:active {
+  transform: scale(0.85);
+}
+
+/* Modal and Dropdown transitions */
+.modal-backdrop-fade {
+  transition: opacity var(--motion-normal) var(--ease-out-smooth);
+}
+
+.modal-dialog-scale {
+  transition: transform var(--motion-normal) var(--ease-out-smooth),
+              opacity var(--motion-normal) var(--ease-out-smooth);
+}
+
+/* Smooth progress width */
+.progress-bar-smooth {
+  transition: width var(--motion-slow) var(--ease-out-smooth);
 }
 
 /* Typing pulse animation */
@@ -73,4 +215,26 @@
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* Shimmer Loading Skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* Respect user accessibility settings */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

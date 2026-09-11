@@ -16,17 +16,30 @@ model User {
   bio           String?
   role          String    @default("user") // "user" | "admin"
   is_suspended  Boolean   @default(false)
+  job_title     String?
+  department    String?
+  status_message String?
+  theme_pref    String?   @default("dark")
   created_at    DateTime  @default(now())
 
   // Relations
-  memberships   ConversationMember[]
-  messages      Message[]
-  auditLogsSent AdminAuditLog[]      @relation("AdminUser")
-  auditLogsRecv AdminAuditLog[]      @relation("TargetUser")
+  memberships        ConversationMember[]
+  messages           Message[]
+  auditLogsSent      AdminAuditLog[]      @relation("AdminUser")
+  auditLogsRecv      AdminAuditLog[]      @relation("TargetUser")
 
   // Simple Contacts modeling: Owner of a contact entry, and the contact user
-  contactsOwned Contact[]            @relation("ContactOwner")
-  contactsAs    Contact[]            @relation("ContactUser")
+  contactsOwned      Contact[]            @relation("ContactOwner")
+  contactsAs         Contact[]            @relation("ContactUser")
+
+  // Workspace relations
+  workspaceMembers   WorkspaceMember[]
+  createdTasks       Task[]               @relation("TaskCreator")
+  assignedTasks      Task[]               @relation("TaskAssignee")
+  taskComments       TaskComment[]
+  notes              Note[]
+  savedItems         SavedItem[]
+  notifications      Notification[]
 }
 
 model Contact {
@@ -41,16 +54,18 @@ model Contact {
 }
 
 model Conversation {
-  id          String   @id @default(uuid())
-  type        String   // "direct" | "group"
-  name        String?  // null for direct chats
-  is_public   Boolean  @default(false) // only meaningful for groups
-  invite_code String?  @unique // unique invite code for private groups
-  created_at  DateTime @default(now())
+  id           String   @id @default(uuid())
+  workspace_id String?  // Optional relation to workspace for company channels
+  type         String   // "direct" | "group"
+  name         String?  // null for direct chats
+  is_public    Boolean  @default(false) // only meaningful for groups
+  invite_code  String?  @unique // unique invite code for private groups
+  created_at   DateTime @default(now())
 
   // Relations
-  members  ConversationMember[]
-  messages Message[]
+  workspace Workspace?           @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  members   ConversationMember[]
+  messages  Message[]
 }
 
 model ConversationMember {
@@ -92,4 +107,224 @@ model AdminAuditLog {
 
   admin  User  @relation("AdminUser", fields: [admin_user_id], references: [id], onDelete: Cascade)
   target User? @relation("TargetUser", fields: [target_user_id], references: [id], onDelete: SetNull)
+}
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  category    String?  @default("General")
+  logo        String?
+  invite_code String   @unique
+  owner_id    String
+  created_at  DateTime @default(now())
+
+  members       WorkspaceMember[]
+  projects      Project[]
+  tasks         Task[]
+  announcements Announcement[]
+  activities    WorkspaceActivity[]
+  meetings      Meeting[]
+  files         WorkspaceFile[]
+  departments   Department[]
+  notes         Note[]
+  channels      Conversation[]
+}
+
+model WorkspaceMember {
+  workspace_id String
+  user_id      String
+  role         String   @default("member") // "owner" | "admin" | "manager" | "member" | "guest"
+  department   String?
+  joined_at    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([workspace_id, user_id])
+}
+
+model Department {
+  id           String   @id @default(uuid())
+  workspace_id String
+  name         String
+  description  String?
+  created_at   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id           String    @id @default(uuid())
+  workspace_id String
+  name         String
+  description  String?
+  color        String    @default("#3b82f6")
+  icon         String    @default("folder")
+  start_date   DateTime?
+  due_date     DateTime?
+  priority     String    @default("MEDIUM") // "LOW" | "MEDIUM" | "HIGH" | "URGENT"
+  status       String    @default("Active") // "Planning" | "Active" | "On Hold" | "Completed" | "Archived"
+  owner_id     String
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  workspace  Workspace       @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  tasks      Task[]
+  milestones Milestone[]
+  files      WorkspaceFile[]
+  meetings   Meeting[]
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
+  project_id  String
+  title       String
+  description String?
+  due_date    DateTime?
+  status      String    @default("PENDING") // "PENDING" | "COMPLETED"
+  created_at  DateTime  @default(now())
+
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id           String    @id @default(uuid())
+  workspace_id String
+  project_id   String?
+  title        String
+  description  String?
+  status       String    @default("TODO") // "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "COMPLETED"
+  priority     String    @default("MEDIUM") // "LOW" | "MEDIUM" | "HIGH" | "URGENT"
+  assignee_id  String?
+  creator_id   String
+  due_date     DateTime?
+  start_date   DateTime?
+  labels       String?   // JSON array of strings
+  subtasks     String?   // JSON array of { id, title, completed }
+  dependencies String?   // JSON array of task IDs this task is blocked by
+  order_index  Int       @default(0)
+  source_msg   String?   // Context snippet if converted from chat
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  workspace Workspace       @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  project   Project?        @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  creator   User            @relation("TaskCreator", fields: [creator_id], references: [id], onDelete: Cascade)
+  assignee  User?           @relation("TaskAssignee", fields: [assignee_id], references: [id], onDelete: SetNull)
+  comments  TaskComment[]
+  files     WorkspaceFile[]
+}
+
+model TaskComment {
+  id         String   @id @default(uuid())
+  task_id    String
+  user_id    String
+  content    String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model Announcement {
+  id           String    @id @default(uuid())
+  workspace_id String
+  author_id    String
+  title        String
+  content      String
+  priority     String    @default("NORMAL") // "NORMAL" | "HIGH" | "URGENT"
+  expires_at   DateTime?
+  created_at   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceActivity {
+  id           String   @id @default(uuid())
+  workspace_id String
+  user_id      String
+  user_name    String
+  action       String
+  object_type  String   // "task" | "project" | "member" | "announcement"
+  object_title String
+  details      String?
+  created_at   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+}
+
+model Meeting {
+  id           String    @id @default(uuid())
+  workspace_id String
+  project_id   String?
+  title        String
+  description  String?
+  start_time   DateTime
+  end_time     DateTime
+  link         String?
+  created_by   String
+  created_at   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [project_id], references: [id], onDelete: SetNull)
+}
+
+model Note {
+  id           String   @id @default(uuid())
+  workspace_id String
+  user_id      String
+  title        String
+  content      String
+  tags         String?
+  is_pinned    Boolean  @default(false)
+  is_archived  Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceFile {
+  id           String   @id @default(uuid())
+  workspace_id String
+  project_id   String?
+  task_id      String?
+  name         String
+  file_type    String   // "image" | "pdf" | "document" | "code" | "archive" | "other"
+  size_bytes   Int      @default(0)
+  url          String
+  uploaded_by  String
+  created_at   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  task      Task?     @relation(fields: [task_id], references: [id], onDelete: SetNull)
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  content    String
+  type       String   // "task_assigned" | "task_completed" | "mention" | "announcement" | "invitation" | "comment"
+  link       String?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model SavedItem {
+  id         String   @id @default(uuid())
+  user_id    String
+  item_type  String   // "task" | "message" | "announcement" | "file"
+  item_id    String
+  title      String
+  details    String?
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }

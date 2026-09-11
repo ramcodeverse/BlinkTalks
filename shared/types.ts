@@ -16,6 +16,215 @@ export interface UserProfile {
   bio?: string | null;
   role: UserRole;
   is_suspended: boolean;
+  job_title?: string | null;
+  department?: string | null;
+  status_message?: string | null;
+  theme_pref?: string | null;
+  created_at: string;
+}
+
+// ==========================================
+// WORKSPACE & COLLABORATION TYPES
+// ==========================================
+
+export type WorkspaceRole = "owner" | "admin" | "manager" | "member" | "guest";
+
+export type TaskStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "COMPLETED";
+
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+export type ProjectStatus = "Planning" | "Active" | "On Hold" | "Completed" | "Archived";
+
+export interface SubtaskItem {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  logo?: string | null;
+  invite_code: string;
+  owner_id: string;
+  created_at: string;
+  role?: WorkspaceRole;
+  members_count?: number;
+  projects_count?: number;
+  tasks_count?: number;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: WorkspaceRole;
+  department?: string | null;
+  joined_at: string;
+  user: UserProfile;
+}
+
+export interface Department {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  created_at: string;
+  members_count?: number;
+}
+
+export interface Project {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string | null;
+  color: string;
+  icon: string;
+  start_date?: string | null;
+  due_date?: string | null;
+  priority: TaskPriority;
+  status: ProjectStatus;
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+  tasks_count?: number;
+  completed_tasks_count?: number;
+  in_progress_tasks_count?: number;
+  overdue_tasks_count?: number;
+  completion_percentage?: number;
+}
+
+export interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  description?: string | null;
+  due_date?: string | null;
+  status: "PENDING" | "COMPLETED";
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  workspace_id: string;
+  project_id?: string | null;
+  title: string;
+  description?: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee_id?: string | null;
+  creator_id: string;
+  due_date?: string | null;
+  start_date?: string | null;
+  labels: string[];
+  subtasks: SubtaskItem[];
+  dependencies: string[];
+  order_index: number;
+  source_msg?: string | null;
+  created_at: string;
+  updated_at: string;
+  assignee?: UserProfile | null;
+  creator?: UserProfile;
+  project?: { id: string; name: string; color: string } | null;
+  comments_count?: number;
+  comments?: TaskComment[];
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  user?: UserProfile;
+}
+
+export interface Announcement {
+  id: string;
+  workspace_id: string;
+  author_id: string;
+  title: string;
+  content: string;
+  priority: "NORMAL" | "HIGH" | "URGENT";
+  expires_at?: string | null;
+  created_at: string;
+  author?: UserProfile;
+}
+
+export interface WorkspaceActivity {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  user_name: string;
+  action: string;
+  object_type: string;
+  object_title: string;
+  details?: string | null;
+  created_at: string;
+}
+
+export interface Meeting {
+  id: string;
+  workspace_id: string;
+  project_id?: string | null;
+  title: string;
+  description?: string | null;
+  start_time: string;
+  end_time: string;
+  link?: string | null;
+  created_by: string;
+  created_at: string;
+  project?: { id: string; name: string; color: string } | null;
+}
+
+export interface Note {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  is_pinned: boolean;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceFile {
+  id: string;
+  workspace_id: string;
+  project_id?: string | null;
+  task_id?: string | null;
+  name: string;
+  file_type: string;
+  size_bytes: number;
+  url: string;
+  uploaded_by: string;
+  created_at: string;
+  uploader?: UserProfile;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  type: string;
+  link?: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface SavedItem {
+  id: string;
+  user_id: string;
+  item_type: "task" | "message" | "announcement" | "file";
+  item_id: string;
+  title: string;
+  details?: string | null;
   created_at: string;
 }
 
