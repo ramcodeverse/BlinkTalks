@@ -2,6 +2,9 @@ import { create } from "zustand";
 import {
   Workspace,
   WorkspaceMember,
+  WorkspaceInvitation,
+  WorkspaceAuditLog,
+  WorkspaceRole,
   Department,
   Project,
   Task,
@@ -97,6 +100,31 @@ interface WorkspaceState {
   addMember: (userId: string, role?: string, department?: string) => Promise<void>;
   updateMemberRole: (memberId: string, role: string, department?: string) => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
+  suspendMember: (userId: string, reason?: string) => Promise<void>;
+  restoreMember: (userId: string) => Promise<void>;
+  removeMemberWithReason: (userId: string, reason?: string) => Promise<void>;
+  bulkRemoveMembers: (userIds: string[], reason?: string) => Promise<void>;
+  bulkUpdateMemberRoles: (userIds: string[], role: string) => Promise<void>;
+  transferOwnership: (newOwnerId: string) => Promise<void>;
+  fetchMemberWorkload: (userId: string) => Promise<any>;
+
+  // Invitations
+  invitations: WorkspaceInvitation[];
+  isLoadingInvitations: boolean;
+  fetchInvitations: (status?: string) => Promise<void>;
+  createInviteLink: (role?: string, expiresInDays?: number, targetEmailOrUser?: string) => Promise<WorkspaceInvitation>;
+  batchInvite: (targets: string[], role?: string) => Promise<{ created: WorkspaceInvitation[]; skipped: string[] }>;
+  revokeInvitation: (invitationId: string) => Promise<void>;
+  resendInvitation: (invitationId: string) => Promise<WorkspaceInvitation>;
+  validateInviteCode: (code: string) => Promise<any>;
+
+  // Audit Logs
+  auditLogs: WorkspaceAuditLog[];
+  isLoadingAuditLogs: boolean;
+  fetchAuditLogs: (action?: string) => Promise<void>;
+
+  // Real-time Event Handler
+  handleWorkspaceRealtimeEvent: (event: string, data: any) => void;
 
   // Announcements
   announcements: Announcement[];
@@ -630,6 +658,303 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().fetchActivities();
     }
   },
+
+  suspendMember: async (userId, reason) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${userId}/suspend`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to suspend member");
+    }
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+    get().fetchActivities();
+  },
+
+  restoreMember: async (userId) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${userId}/restore`, {
+      method: "POST",
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to restore member");
+    }
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+    get().fetchActivities();
+  },
+
+  removeMemberWithReason: async (userId, reason) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${userId}/remove`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to remove member");
+    }
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+    get().fetchActivities();
+  },
+
+  bulkRemoveMembers: async (userIds, reason) => {
+    const ws = get().activeWorkspace;
+    if (!ws || userIds.length === 0) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/bulk-remove`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ user_ids: userIds, reason }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to remove selected members");
+    }
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+    get().fetchActivities();
+  },
+
+  bulkUpdateMemberRoles: async (userIds, role) => {
+    const ws = get().activeWorkspace;
+    if (!ws || userIds.length === 0) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/bulk-role`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ user_ids: userIds, role }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to update member roles");
+    }
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+  },
+
+  transferOwnership: async (newOwnerId) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/transfer-ownership`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ new_owner_id: newOwnerId }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to transfer ownership");
+    }
+    await get().fetchWorkspaces();
+    await get().fetchMembers();
+    get().fetchAuditLogs();
+  },
+
+  fetchMemberWorkload: async (userId) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return null;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${userId}/work`, {
+      headers: getAuthHeader(),
+    });
+    if (res.ok) {
+      return await safeParseJson(res);
+    }
+    return null;
+  },
+
+  // Invitations
+  invitations: [],
+  isLoadingInvitations: false,
+
+  fetchInvitations: async (status) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    set({ isLoadingInvitations: true });
+    try {
+      const url = status
+        ? `${API_BASE}/api/workspaces/${ws.id}/invitations?status=${status}`
+        : `${API_BASE}/api/workspaces/${ws.id}/invitations`;
+      const res = await fetch(url, { headers: getAuthHeader() });
+      if (res.ok) {
+        const data = await safeParseJson(res);
+        set({
+          invitations: Array.isArray(data) ? data : data.invitations || [],
+          isLoadingInvitations: false,
+        });
+      } else {
+        set({ isLoadingInvitations: false });
+      }
+    } catch (err) {
+      console.error("fetchInvitations error:", err);
+      set({ isLoadingInvitations: false });
+    }
+  },
+
+  createInviteLink: async (role = "MEMBER", expiresInDays = 7, targetEmailOrUser) => {
+    const ws = get().activeWorkspace;
+    if (!ws) throw new Error("No active workspace");
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/invitations`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        role,
+        expiresInDays,
+        targetEmailOrUser,
+      }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to create invitation");
+    }
+    const data = await safeParseJson(res);
+    const invitation = data?.invitation || data;
+    set((state) => ({
+      invitations: [invitation, ...state.invitations],
+    }));
+    get().fetchAuditLogs();
+    return invitation;
+  },
+
+  batchInvite: async (targets, role = "MEMBER") => {
+    const ws = get().activeWorkspace;
+    if (!ws) throw new Error("No active workspace");
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/invitations/batch`, {
+      method: "POST",
+      headers: getAuthHeader(),
+      body: JSON.stringify({ targets, role }),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to send batch invitations");
+    }
+    const data = await safeParseJson(res);
+    await get().fetchInvitations();
+    get().fetchAuditLogs();
+    return data;
+  },
+
+  revokeInvitation: async (invitationId) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/invitations/${invitationId}/revoke`, {
+      method: "POST",
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to revoke invitation");
+    }
+    set((state) => ({
+      invitations: state.invitations.map((i) =>
+        i.id === invitationId ? { ...i, status: "REVOKED" as const } : i
+      ),
+    }));
+    get().fetchAuditLogs();
+  },
+
+  resendInvitation: async (invitationId) => {
+    const ws = get().activeWorkspace;
+    if (!ws) throw new Error("No active workspace");
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/invitations/${invitationId}/resend`, {
+      method: "POST",
+      headers: getAuthHeader(),
+    });
+    if (!res.ok) {
+      const err = await safeParseJson(res);
+      throw new Error(err.error || "Failed to resend invitation");
+    }
+    const data = await safeParseJson(res);
+    const renewed = data?.invitation || data;
+    set((state) => ({
+      invitations: state.invitations.map((i) => (i.id === invitationId ? renewed : i)),
+    }));
+    get().fetchAuditLogs();
+    return renewed;
+  },
+
+  validateInviteCode: async (code) => {
+    const res = await fetch(`${API_BASE}/api/workspaces/validate-invite/${encodeURIComponent(code)}`);
+    const data = await safeParseJson(res);
+    if (!res.ok) {
+      throw new Error(data.error || "Invalid invitation code");
+    }
+    return data;
+  },
+
+  // Audit Logs
+  auditLogs: [],
+  isLoadingAuditLogs: false,
+
+  fetchAuditLogs: async (action) => {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    set({ isLoadingAuditLogs: true });
+    try {
+      const url = action
+        ? `${API_BASE}/api/workspaces/${ws.id}/audit-logs?action=${action}`
+        : `${API_BASE}/api/workspaces/${ws.id}/audit-logs`;
+      const res = await fetch(url, { headers: getAuthHeader() });
+      if (res.ok) {
+        const data = await safeParseJson(res);
+        set({
+          auditLogs: Array.isArray(data) ? data : data.logs || [],
+          isLoadingAuditLogs: false,
+        });
+      } else {
+        set({ isLoadingAuditLogs: false });
+      }
+    } catch (err) {
+      console.error("fetchAuditLogs error:", err);
+      set({ isLoadingAuditLogs: false });
+    }
+  },
+
+  // Realtime Event Handler
+  handleWorkspaceRealtimeEvent: (event, data) => {
+    const activeWs = get().activeWorkspace;
+    if (!activeWs || activeWs.id !== data?.workspace_id) return;
+
+    console.log(`⚡ Real-time workspace event received: ${event}`, data);
+
+    switch (event) {
+      case "member_joined":
+      case "member_removed":
+      case "member_suspended":
+      case "member_restored":
+      case "role_changed":
+        get().fetchMembers();
+        get().fetchActivities();
+        get().fetchAnalytics();
+        get().fetchAuditLogs();
+        break;
+
+      case "ownership_transferred":
+        get().fetchWorkspaces();
+        get().fetchMembers();
+        get().fetchAuditLogs();
+        break;
+
+      case "invitation_created":
+      case "invitation_revoked":
+      case "invitation_accepted":
+        get().fetchInvitations();
+        get().fetchAuditLogs();
+        break;
+
+      default:
+        break;
+    }
+  },
+
 
   // Announcements
   announcements: [],

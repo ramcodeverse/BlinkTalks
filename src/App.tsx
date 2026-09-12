@@ -23,8 +23,39 @@ export default function App() {
   const { user, initializeAuth, logout, connectionStatus } = useChatStore();
   const { isTaskModalOpen, setIsTaskModalOpen } = useWorkspaceStore();
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [view, setView] = useState<"landing" | "auth" | "app">("landing");
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [inviteCode] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("invite") || params.get("code") || params.get("join");
+    if (code) return code;
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    if (parts[0] === "join" && parts.length >= 2) {
+      return parts[parts.length - 1];
+    }
+    return null;
+  });
+  const [view, setView] = useState<"landing" | "auth" | "app">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("invite") || params.get("code") || params.get("join");
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      if (code || (parts[0] === "join" && parts.length >= 2)) {
+        return "auth";
+      }
+    }
+    return "landing";
+  });
+  const [authMode, setAuthMode] = useState<"login" | "signup">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("invite") || params.get("code") || params.get("join");
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      if (code || (parts[0] === "join" && parts.length >= 2)) {
+        return "signup";
+      }
+    }
+    return "login";
+  });
   const [activeNav, setActiveNav] = useState<NavItem>("workspace");
   
   // Modals & UI States
@@ -183,6 +214,7 @@ export default function App() {
           <AuthScreen
             onBackToLanding={() => setView("landing")}
             defaultIsLogin={authMode === "login"}
+            inviteCode={inviteCode}
           />
         ) : (
           <LandingPage

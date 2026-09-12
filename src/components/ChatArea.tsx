@@ -701,6 +701,104 @@ export default function ChatArea() {
                       const reactionsForMsg = messageReactions[msg.id] || {};
                       const isCopied = copiedMsgId === msg.id;
 
+                      const isActivity =
+                        msg.message_type === "task_activity" ||
+                        msg.message_type === "project_activity" ||
+                        msg.message_type === "system";
+
+                      if (isActivity) {
+                        let activityMeta: any = null;
+                        if (msg.metadata) {
+                          try {
+                            activityMeta =
+                              typeof msg.metadata === "string"
+                                ? JSON.parse(msg.metadata)
+                                : msg.metadata;
+                          } catch {
+                            activityMeta = null;
+                          }
+                        }
+
+                        const isProject = msg.message_type === "project_activity";
+
+                        return (
+                          <motion.div
+                            id={`msg-item-${msg.id}`}
+                            key={msg.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.98, y: 8 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
+                            className="flex w-full justify-center my-3 px-2"
+                          >
+                            <div className="w-full max-w-xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-4 shadow-lg backdrop-blur-sm transition-all duration-200">
+                              <div className="flex items-start gap-3.5">
+                                <div
+                                  className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                                    isProject
+                                      ? "bg-violet-500/10 border border-violet-500/20 text-violet-400"
+                                      : "bg-cyan-500/10 border border-cyan-500/20 text-cyan-400"
+                                  }`}
+                                >
+                                  {isProject ? (
+                                    <Briefcase className="w-4 h-4" />
+                                  ) : (
+                                    <CheckSquare className="w-4 h-4" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <span className="text-xs font-semibold text-slate-200">
+                                        {activityMeta?.actor_name || msg.sender_name}
+                                      </span>
+                                      <span
+                                        className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-medium ${
+                                          isProject
+                                            ? "bg-violet-500/15 text-violet-300 border border-violet-500/25"
+                                            : "bg-cyan-500/15 text-cyan-300 border border-cyan-500/25"
+                                        }`}
+                                      >
+                                        {isProject ? "Project Broadcast" : "Task Broadcast"}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-500 font-mono shrink-0">
+                                      {new Date(msg.created_at).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </div>
+
+                                  <p className="text-xs text-slate-100 font-normal leading-relaxed">
+                                    {msg.content}
+                                  </p>
+
+                                  {activityMeta?.old_value && activityMeta?.new_value && (
+                                    <div className="mt-2.5 flex items-center gap-2 text-xs font-mono bg-slate-950/70 px-3 py-1.5 rounded-xl border border-slate-800/80 w-fit">
+                                      <span className="text-slate-400">{activityMeta.old_value}</span>
+                                      <span className="text-cyan-400 font-bold">➔</span>
+                                      <span className="text-emerald-400 font-semibold">
+                                        {activityMeta.new_value}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {activityMeta?.project_name && (
+                                    <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5">
+                                      <span className="text-slate-500">Project:</span>
+                                      <span className="text-slate-300 font-medium">
+                                        {activityMeta.project_name}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      }
+
                       return (
                         <motion.div
                           id={`msg-item-${msg.id}`}

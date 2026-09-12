@@ -10,6 +10,8 @@ generator client {
 model User {
   id            String    @id @default(uuid())
   username      String    @unique
+  email         String?   @unique
+  email_verified Boolean  @default(false)
   password_hash String
   display_name  String
   avatar        String?
@@ -34,6 +36,8 @@ model User {
 
   // Workspace relations
   workspaceMembers   WorkspaceMember[]
+  invitationsSent    WorkspaceInvitation[] @relation("WorkspaceInvitesSent")
+  workspaceAuditLogs WorkspaceAuditLog[]   @relation("WorkspaceAuditActor")
   createdTasks       Task[]               @relation("TaskCreator")
   assignedTasks      Task[]               @relation("TaskAssignee")
   taskComments       TaskComment[]
@@ -58,6 +62,9 @@ model Conversation {
   workspace_id String?  // Optional relation to workspace for company channels
   type         String   // "direct" | "group"
   name         String?  // null for direct chats
+  category     String?  // e.g. "Software Engineering", "Product", "Design"
+  topic        String?  // channel purpose / focus topic
+  is_community Boolean  @default(false)
   is_public    Boolean  @default(false) // only meaningful for groups
   invite_code  String?  @unique // unique invite code for private groups
   created_at   DateTime @default(now())
@@ -87,7 +94,9 @@ model Message {
   id              String    @id @default(uuid())
   conversation_id String
   sender_id       String
-  content         String    // Encrypted via AES-256-GCM
+  content         String    // Encrypted via AES-256-GCM or plaintext system activity
+  message_type    String    @default("chat") // "chat" | "task_activity" | "project_activity" | "system"
+  metadata        String?   // JSON metadata for activity logs
   created_at      DateTime  @default(now())
   edited_at       DateTime?
 
@@ -129,19 +138,69 @@ model Workspace {
   departments   Department[]
   notes         Note[]
   channels      Conversation[]
+  invitations   WorkspaceInvitation[]
+  auditLogs     WorkspaceAuditLog[]
 }
 
 model WorkspaceMember {
-  workspace_id String
-  user_id      String
-  role         String   @default("member") // "owner" | "admin" | "manager" | "member" | "guest"
-  department   String?
-  joined_at    DateTime @default(now())
+  workspace_id   String
+  user_id        String
+  role           String    @default("MEMBER") // "OWNER" | "ADMIN" | "MANAGER" | "MEMBER" | "GUEST"
+  status         String    @default("ACTIVE") // "ACTIVE" | "SUSPENDED" | "REMOVED"
+  department     String?
+  joined_at      DateTime  @default(now())
+  joined_by      String?
+  removal_reason String?
+  suspended_at   DateTime?
+  last_active_at DateTime?
+  updated_at     DateTime  @default(now()) @updatedAt
 
   workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@id([workspace_id, user_id])
+  @@index([workspace_id, status])
+}
+
+model WorkspaceInvitation {
+  id                  String    @id @default(uuid())
+  workspace_id        String
+  invite_code         String    @unique // Secure random string e.g. ACME-7K4M9P or WS-8X2N9K
+  role                String    @default("MEMBER") // "MEMBER" | "MANAGER" | "ADMIN"
+  status              String    @default("PENDING") // "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED"
+  invited_by          String    // userId of admin
+  invited_user_id     String?   // optional specific user id
+  invited_email       String?   // optional email or @username
+  token_hash          String?
+  allowed_departments String?
+  allowed_communities String?
+  created_at          DateTime  @default(now())
+  expires_at          DateTime?
+  accepted_at         DateTime?
+  accepted_by         String?
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  inviter   User      @relation("WorkspaceInvitesSent", fields: [invited_by], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, status])
+  @@index([invite_code])
+}
+
+model WorkspaceAuditLog {
+  id           String   @id @default(uuid())
+  workspace_id String
+  actor_id     String
+  actor_name   String
+  action       String   // "MEMBER_INVITED" | "INVITE_ACCEPTED" | "MEMBER_JOINED" | "MEMBER_REMOVED" | "MEMBER_SUSPENDED" | "MEMBER_RESTORED" | "ROLE_CHANGED" | "INVITE_REVOKED" | "INVITE_REGENERATED" | "OWNERSHIP_TRANSFERRED"
+  target_id    String?
+  target_name  String?
+  details      String?
+  created_at   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  actor     User      @relation("WorkspaceAuditActor", fields: [actor_id], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, created_at])
 }
 
 model Department {
@@ -157,6 +216,7 @@ model Department {
 model Project {
   id           String    @id @default(uuid())
   workspace_id String
+  community_id String?   // Linked community channel for activity broadcasts
   name         String
   description  String?
   color        String    @default("#3b82f6")
@@ -192,6 +252,7 @@ model Task {
   id           String    @id @default(uuid())
   workspace_id String
   project_id   String?
+  community_id String?   // Linked community channel for activity broadcasts
   title        String
   description  String?
   status       String    @default("TODO") // "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "COMPLETED"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useWorkspaceStore } from "../../store/workspaceStore.ts";
+import { useChatStore } from "../../store/chatStore.ts";
 import { TaskPriority, TaskStatus, SubtaskItem } from "../../../shared/types.ts";
 import {
   X,
@@ -12,6 +13,7 @@ import {
   CheckSquare,
   Building2,
   AlertCircle,
+  Radio,
 } from "lucide-react";
 
 interface CreateTaskModalProps {
@@ -37,14 +39,18 @@ export default function CreateTaskModal({
     taskModalPrefill,
     setTaskModalPrefill,
   } = useWorkspaceStore();
+  const { conversations } = useChatStore();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TaskStatus>(defaultStatus);
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [projectId, setProjectId] = useState<string>("");
+  const [communityId, setCommunityId] = useState<string>("");
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
+
+  const communityChannels = conversations.filter((c) => c.type === "group");
 
   // Subtasks
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>([]);
@@ -63,7 +69,10 @@ export default function CreateTaskModal({
       setDescription(taskModalPrefill?.description || "");
       setStatus((taskModalPrefill?.status as TaskStatus) || defaultStatus);
       setPriority((taskModalPrefill?.priority as TaskPriority) || "MEDIUM");
-      setProjectId(taskModalPrefill?.project_id || activeProject?.id || "");
+      const initialProjId = taskModalPrefill?.project_id || activeProject?.id || "";
+      setProjectId(initialProjId);
+      const proj = projects.find((p) => p.id === initialProjId);
+      setCommunityId(proj?.community_id || "");
       setAssigneeId(taskModalPrefill?.assignee_id || "");
       setDueDate("");
       setSubtasks([]);
@@ -75,7 +84,7 @@ export default function CreateTaskModal({
         fetchWorkspaces();
       }
     }
-  }, [isOpen, taskModalPrefill, activeProject, defaultStatus, activeWorkspace, fetchWorkspaces]);
+  }, [isOpen, taskModalPrefill, activeProject, defaultStatus, activeWorkspace, fetchWorkspaces, projects]);
 
   if (!isOpen) return null;
 
@@ -92,6 +101,7 @@ export default function CreateTaskModal({
         status,
         priority,
         project_id: projectId || null,
+        community_id: communityId || null,
         assignee_id: assigneeId || null,
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
         subtasks,
@@ -251,8 +261,8 @@ export default function CreateTaskModal({
             </div>
           </div>
 
-          {/* Project, Assignee, Due Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Project, Broadcast Channel, Assignee, Due Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
                 <Folder className="h-3.5 w-3.5 text-slate-400" />
@@ -260,13 +270,39 @@ export default function CreateTaskModal({
               </label>
               <select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onChange={(e) => {
+                  const newPid = e.target.value;
+                  setProjectId(newPid);
+                  const p = projects.find((proj) => proj.id === newPid);
+                  if (p?.community_id) {
+                    setCommunityId(p.community_id);
+                  }
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
               >
                 <option value="">No Project (General)</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
+                <Radio className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Broadcast Channel</span>
+              </label>
+              <select
+                value={communityId}
+                onChange={(e) => setCommunityId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
+              >
+                <option value="">Auto (Linked Channel)</option>
+                {communityChannels.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    #{c.name} {c.category ? `(${c.category})` : ""}
                   </option>
                 ))}
               </select>

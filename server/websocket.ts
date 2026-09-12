@@ -105,6 +105,17 @@ export function setupWebSocketServer(server: Server) {
       // Subscribe user socket to all of their current conversation channels
       await subscribeUserToConversations(ws);
 
+      // Subscribe user socket to workspace events
+      const unsubWorkspace = pubsub.subscribe("workspace:events", (payloadStr) => {
+        try {
+          const eventPayload = JSON.parse(payloadStr);
+          sendWSMessage(ws, "workspace_event" as any, eventPayload);
+        } catch (err) {
+          console.error("Error parsing workspace pubsub event:", err);
+        }
+      });
+      ws.subscriptions.set("workspace:events", unsubWorkspace);
+
       // Initial success handshake
       sendWSMessage(ws, "auth_ack", {
         userId,
@@ -393,6 +404,8 @@ export function setupWebSocketServer(server: Server) {
           sender_username: myMembership.user.username,
           sender_avatar: myMembership.user.avatar,
           content: content.trim(), // Send PLAINTEXT over authenticated WebSocket
+          message_type: message.message_type || "chat",
+          metadata: message.metadata || null,
           created_at: message.created_at.toISOString(),
           temp_id, // include temp_id to let the original client resolve local pending state
         },

@@ -32,7 +32,9 @@ interface ChatState {
   setAuth: (user: UserProfile | null, token: string | null, refreshToken: string | null) => void;
   initializeAuth: () => Promise<boolean>;
   login: (username: string, password: string) => Promise<void>;
-  signup: (username: string, password: string, displayName: string) => Promise<void>;
+  signup: (username: string, password: string, displayName: string, email?: string, inviteCode?: string) => Promise<any>;
+  verifyEmail: (email: string) => Promise<void>;
+  resendVerificationEmail: (email: string) => Promise<void>;
   logout: () => void;
   refreshSession: () => Promise<boolean>;
   updateProfile: (displayName: string, bio: string) => Promise<void>;
@@ -253,11 +255,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await get().fetchContacts();
   },
 
-  signup: async (username, password, displayName) => {
+  signup: async (username, password, displayName, email, inviteCode) => {
     const res = await fetch(`${API_BASE}/api/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, display_name: displayName }),
+      body: JSON.stringify({
+        username,
+        password,
+        display_name: displayName,
+        email,
+        invite_code: inviteCode,
+      }),
     });
 
     const data = await safeParseJson(res);
@@ -269,6 +277,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().connectSocket();
     await get().fetchConversations();
     await get().fetchContacts();
+    return data;
+  },
+
+  verifyEmail: async (email: string) => {
+    const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await safeParseJson(res);
+    if (!res.ok) {
+      throw new Error(data.error || "Verification failed");
+    }
+    const currentUser = get().user;
+    if (currentUser) {
+      set({ user: { ...currentUser, email_verified: true } });
+    }
+  },
+
+  resendVerificationEmail: async (email: string) => {
+    const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await safeParseJson(res);
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to resend verification email");
+    }
   },
 
   logout: () => {
@@ -963,6 +1000,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
             alert("You have been removed from this group.");
           }
           get().fetchConversations();
+          break;
+        }
+
+        case "workspace_event": {
+          try {
+            import("./workspaceStore.js").then(({ useWorkspaceStore }) => {
+              useWorkspaceStore.getState().handleWorkspaceRealtimeEvent(payload.event, payload.data);
+            });
+          } catch (e) {
+            console.error("Error dispatching workspace_event:", e);
+          }
           break;
         }
 

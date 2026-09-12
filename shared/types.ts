@@ -12,6 +12,8 @@ export interface UserProfile {
   id: string;
   username: string; // unique, e.g. "ram"
   display_name: string;
+  email?: string | null;
+  email_verified?: boolean;
   avatar?: string | null;
   bio?: string | null;
   role: UserRole;
@@ -27,7 +29,56 @@ export interface UserProfile {
 // WORKSPACE & COLLABORATION TYPES
 // ==========================================
 
-export type WorkspaceRole = "owner" | "admin" | "manager" | "member" | "guest";
+export type WorkspaceRole =
+  | "OWNER"
+  | "ADMIN"
+  | "MANAGER"
+  | "MEMBER"
+  | "GUEST"
+  | "owner"
+  | "admin"
+  | "manager"
+  | "member"
+  | "guest";
+
+export type MemberStatus = "ACTIVE" | "SUSPENDED" | "REMOVED";
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+export interface WorkspaceInvitation {
+  id: string;
+  workspace_id: string;
+  invite_code: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  invited_by: string;
+  invited_user_id?: string | null;
+  invited_email?: string | null;
+  allowed_departments?: string | null;
+  allowed_communities?: string | null;
+  created_at: string;
+  expires_at?: string | null;
+  accepted_at?: string | null;
+  accepted_by?: string | null;
+  inviter?: {
+    id: string;
+    username: string;
+    display_name: string;
+    avatar?: string | null;
+  };
+}
+
+export interface WorkspaceAuditLog {
+  id: string;
+  workspace_id: string;
+  actor_id: string;
+  actor_name: string;
+  action: string;
+  target_id?: string | null;
+  target_name?: string | null;
+  details?: string | null;
+  created_at: string;
+}
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "IN_REVIEW" | "BLOCKED" | "COMPLETED";
 
@@ -51,6 +102,7 @@ export interface Workspace {
   owner_id: string;
   created_at: string;
   role?: WorkspaceRole;
+  status?: MemberStatus;
   members_count?: number;
   projects_count?: number;
   tasks_count?: number;
@@ -61,8 +113,14 @@ export interface WorkspaceMember {
   workspace_id: string;
   user_id: string;
   role: WorkspaceRole;
+  status: MemberStatus;
   department?: string | null;
   joined_at: string;
+  joined_by?: string | null;
+  removal_reason?: string | null;
+  suspended_at?: string | null;
+  last_active_at?: string | null;
+  updated_at?: string;
   user: UserProfile;
 }
 
@@ -78,6 +136,7 @@ export interface Department {
 export interface Project {
   id: string;
   workspace_id: string;
+  community_id?: string | null;
   name: string;
   description?: string | null;
   color: string;
@@ -110,6 +169,7 @@ export interface Task {
   id: string;
   workspace_id: string;
   project_id?: string | null;
+  community_id?: string | null;
   title: string;
   description?: string | null;
   status: TaskStatus;
@@ -238,6 +298,9 @@ export interface Conversation {
   id: string;
   type: "direct" | "group";
   name?: string | null; // Null for direct chats
+  category?: string | null;
+  topic?: string | null;
+  is_community?: boolean;
   is_public: boolean;
   invite_code?: string | null;
   created_at: string;
@@ -267,6 +330,8 @@ export interface MessagePayload {
   sender_username: string;
   sender_avatar?: string | null;
   content: string; // Plaintext (decrypted by server, never sent encrypted to authenticated socket)
+  message_type?: string; // "chat" | "task_activity" | "project_activity" | "system"
+  metadata?: string | null; // JSON string payload for rich activity cards
   created_at: string;
   edited_at?: string | null;
   // Reactions list associated with this message

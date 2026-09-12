@@ -18,6 +18,7 @@ import {
   CheckSquare,
   Square,
   Flag,
+  Radio,
 } from "lucide-react";
 
 interface TaskDetailModalProps {
@@ -33,18 +34,21 @@ export default function TaskDetailModal({ task, onClose }: TaskDetailModalProps)
     projects,
     members,
   } = useWorkspaceStore();
-  const { user } = useChatStore();
+  const { user, conversations } = useChatStore();
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || "");
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [projectId, setProjectId] = useState<string>(task.project_id || "");
+  const [communityId, setCommunityId] = useState<string>(task.community_id || "");
   const [assigneeId, setAssigneeId] = useState<string>(task.assignee_id || "");
   const [dueDate, setDueDate] = useState<string>(
     task.due_date ? new Date(task.due_date).toISOString().split("T")[0] : ""
   );
-  
+
+  const communityChannels = conversations.filter((c) => c.type === "group");
+
   // Subtasks
   const [subtasks, setSubtasks] = useState<SubtaskItem[]>(task.subtasks || []);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
@@ -67,6 +71,7 @@ export default function TaskDetailModal({ task, onClose }: TaskDetailModalProps)
         status,
         priority,
         project_id: projectId || null,
+        community_id: communityId || null,
         assignee_id: assigneeId || null,
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
         subtasks,
@@ -215,7 +220,7 @@ export default function TaskDetailModal({ task, onClose }: TaskDetailModalProps)
           </div>
 
           {/* Key Meta Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Project */}
             <div>
               <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
@@ -224,13 +229,40 @@ export default function TaskDetailModal({ task, onClose }: TaskDetailModalProps)
               </label>
               <select
                 value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
+                onChange={(e) => {
+                  const newPid = e.target.value;
+                  setProjectId(newPid);
+                  const p = projects.find((proj) => proj.id === newPid);
+                  if (p?.community_id) {
+                    setCommunityId(p.community_id);
+                  }
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
               >
                 <option value="">No Project</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Broadcast Channel */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
+                <Radio className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Broadcast Channel</span>
+              </label>
+              <select
+                value={communityId}
+                onChange={(e) => setCommunityId(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-medium text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
+              >
+                <option value="">Auto (Linked Channel)</option>
+                {communityChannels.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    #{c.name} {c.category ? `(${c.category})` : ""}
                   </option>
                 ))}
               </select>
