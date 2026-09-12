@@ -34,6 +34,7 @@ CONNECT • COMMUNICATE • COLLABORATE • ORGANIZE • GET WORK DONE
 ## 📑 Table of Contents
 
 - [Core Value Proposition](#-core-value-proposition)
+- [Visual Tour & Product Screenshots](#-visual-tour--product-screenshots)
 - [System Architecture](#-system-architecture)
 - [Feature Matrix](#-feature-matrix)
   - [1. Authentication & Onboarding Suite](#1-authentication--onboarding-suite-redesigned)
@@ -60,6 +61,55 @@ BlinkTalks bridges the traditional gap between **instant messaging** (Discord, T
 2. **Zero Phone Number Identity**: Strict `@username` and verified email identity model, preserving privacy while ensuring enterprise-grade auditability.
 3. **Sub-Second Real-Time Response**: Native full-duplex WebSockets with optimistic client updates and automatic reconciliation.
 4. **Restrained Futuristic Aesthetic**: Custom dark palette (`#070b14` / `#0d1527`), fine borders, ambient blue/indigo gradients, and accessible WCAG-compliant contrast.
+
+---
+
+## 📸 Visual Tour & Product Screenshots
+
+### 1. Unified Authentication & Capability Hub
+The completely overhauled signup and login interface combines futuristic dark aesthetics with instant product context. Users preview active platform capabilities, live sprint milestones, and encrypted communication channels before completing registration.
+
+<p align="center">
+  <a href="./public/screenshots/auth_preview.svg">
+    <img src="./public/screenshots/auth_preview.svg" alt="BlinkTalks Redesigned Auth Screen" width="100%" style="border-radius: 12px; box-shadow: 0 16px 32px rgba(0,0,0,0.5);" />
+  </a>
+</p>
+<p align="center">
+  <sub><strong>Figure 1:</strong> Balanced two-column authentication layout showcasing the interactive Capability Strip (CHAT, WORK, KANBAN, TEAMS, PROJECTS), live Mini Workspace progress card, debounced username availability check, and real-time password strength meter.</sub>
+</p>
+
+<br />
+
+### 2. Agile Kanban Sprint Board & Task Execution
+Visual project tracking built directly into the workspace. Drag and drop task cards between customizable status stages with subtask checklists, priority badges, assignee avatars, and due date alerts.
+
+<p align="center">
+  <a href="./public/screenshots/workspace_preview.svg">
+    <img src="./public/screenshots/workspace_preview.svg" alt="BlinkTalks Workspace Kanban Sprint Board" width="100%" style="border-radius: 12px; box-shadow: 0 16px 32px rgba(0,0,0,0.5);" />
+  </a>
+</p>
+<p align="center">
+  <sub><strong>Figure 2:</strong> Real-time Kanban Sprint Board featuring prioritized task cards, progress counters, active filters, and subtask completion tracking.</sub>
+</p>
+
+<br />
+
+### 3. Encrypted Real-Time Messaging & Direct Channels
+High-performance WebSocket messaging gateway featuring slide-up quoted replies, spring-animated emoji reactions, in-conversation query search, live typing indicators, and per-channel draft preservation.
+
+<p align="center">
+  <a href="./public/screenshots/chat_preview.svg">
+    <img src="./public/screenshots/chat_preview.svg" alt="BlinkTalks Real-Time Encrypted Chat Interface" width="100%" style="border-radius: 12px; box-shadow: 0 16px 32px rgba(0,0,0,0.5);" />
+  </a>
+</p>
+<p align="center">
+  <sub><strong>Figure 3:</strong> Full-duplex messaging interface with AES-256-GCM payload encryption badges, live member presence, quoted replies, and interactive reaction chips.</sub>
+</p>
+
+> 💡 **Tip for Contributors**: The SVG assets in `./public/screenshots/` serve as vector-crisp representations that render instantly at any screen density. To replace them with custom live raster screenshots (`.png`/`.webp`):
+> 1. Open the live app in Chrome / Brave / Edge.
+> 2. Press `Ctrl + Shift + P` (or `Cmd + Shift + P` on macOS) and type `Capture full size screenshot`.
+> 3. Save the image to `./public/screenshots/` (e.g. `auth_preview.png`, `workspace_preview.png`) and update the corresponding image tags above.
 
 ---
 
