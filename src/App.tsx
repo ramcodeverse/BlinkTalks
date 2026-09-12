@@ -14,12 +14,14 @@ import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal.tsx";
 import WorkspaceView from "./components/workspace/WorkspaceView.tsx";
 import WorkspaceModal from "./components/workspace/WorkspaceModal.tsx";
 import OnboardingModal from "./components/workspace/OnboardingModal.tsx";
+import CreateTaskModal from "./components/workspace/CreateTaskModal.tsx";
 import { useWorkspaceStore } from "./store/workspaceStore.ts";
 import { ToastProvider } from "./components/Toast.tsx";
 import { Shield, Loader2, Wifi, WifiOff } from "lucide-react";
 
 export default function App() {
   const { user, initializeAuth, logout, connectionStatus } = useChatStore();
+  const { isTaskModalOpen, setIsTaskModalOpen } = useWorkspaceStore();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [view, setView] = useState<"landing" | "auth" | "app">("landing");
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
@@ -336,6 +338,12 @@ export default function App() {
         <WorkspaceModal
           isOpen={showWorkspaceModal}
           onClose={() => setShowWorkspaceModal(false)}
+        />
+
+        {/* Global Create Task Modal */}
+        <CreateTaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => setIsTaskModalOpen(false)}
         />
 
         {/* Governing Console Overlay Modal */}

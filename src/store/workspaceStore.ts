@@ -207,15 +207,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         throw new Error(`Failed to fetch workspaces: ${res.status}`);
       }
       const data = await safeParseJson(res);
-      set({ workspaces: data, isLoadingWorkspaces: false });
+      const list: Workspace[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.workspaces)
+        ? data.workspaces
+        : [];
+      set({ workspaces: list, isLoadingWorkspaces: false });
       
       // If no active workspace is selected, select first one
       const currentActive = get().activeWorkspace;
-      if (!currentActive && data.length > 0) {
-        get().setActiveWorkspace(data[0]);
+      if (!currentActive && list.length > 0) {
+        get().setActiveWorkspace(list[0]);
       } else if (currentActive) {
-        const found = data.find((w: Workspace) => w.id === currentActive.id);
-        if (found) set({ activeWorkspace: found });
+        const found = list.find((w: Workspace) => w.id === currentActive.id);
+        if (found) {
+          set({ activeWorkspace: found });
+        } else if (list.length > 0) {
+          get().setActiveWorkspace(list[0]);
+        }
       }
     } catch (err) {
       console.error("fetchWorkspaces error:", err);
@@ -233,7 +242,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create workspace");
     }
-    const created = await safeParseJson(res);
+    const data = await safeParseJson(res);
+    const created = data?.workspace || data;
     set((state) => ({
       workspaces: [created, ...state.workspaces],
       activeWorkspace: created,
@@ -252,7 +262,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to join workspace");
     }
-    const joined = await safeParseJson(res);
+    const data = await safeParseJson(res);
+    const joined = data?.workspace || data;
     await get().fetchWorkspaces();
     get().setActiveWorkspace(joined);
     return joined;
@@ -281,7 +292,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ projects: data, isLoadingProjects: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.projects)
+          ? data.projects
+          : [];
+        set({ projects: list, isLoadingProjects: false });
       } else {
         set({ isLoadingProjects: false });
       }
@@ -292,7 +308,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createProject: async (data) => {
-    const ws = get().activeWorkspace;
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
     if (!ws) throw new Error("No active workspace");
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/projects`, {
       method: "POST",
@@ -303,7 +323,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create project");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.project || dataRes;
     set((state) => ({ projects: [created, ...state.projects] }));
     get().fetchActivities();
     get().fetchAnalytics();
@@ -317,7 +338,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const updated = await safeParseJson(res);
+      const dataRes = await safeParseJson(res);
+      const updated = dataRes?.project || dataRes;
       set((state) => ({
         projects: state.projects.map((p) => (p.id === id ? updated : p)),
         activeProject: state.activeProject?.id === id ? updated : state.activeProject,
@@ -367,7 +389,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const res = await fetch(url, { headers: getAuthHeader() });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ tasks: data, isLoadingTasks: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.tasks)
+          ? data.tasks
+          : [];
+        set({ tasks: list, isLoadingTasks: false });
       } else {
         set({ isLoadingTasks: false });
       }
@@ -378,8 +405,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createTask: async (data) => {
-    const ws = get().activeWorkspace;
-    if (!ws) throw new Error("No active workspace");
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
+    if (!ws) {
+      // Auto-provision a default workspace if user has none
+      try {
+        ws = await get().createWorkspace("Main Workspace", "Default collaboration workspace", "general");
+      } catch (wsErr) {
+        console.warn("Could not auto-create workspace:", wsErr);
+      }
+    }
+    if (!ws) throw new Error("No active workspace found or could be created.");
+
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/tasks`, {
       method: "POST",
       headers: getAuthHeader(),
@@ -389,7 +429,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create task");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.task || dataRes;
     set((state) => ({ tasks: [created, ...state.tasks] }));
     get().fetchActivities();
     get().fetchAnalytics();
@@ -403,7 +444,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const updated = await safeParseJson(res);
+      const dataRes = await safeParseJson(res);
+      const updated = dataRes?.task || dataRes;
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === id ? updated : t)),
         activeTask: state.activeTask?.id === id ? updated : state.activeTask,
@@ -438,7 +480,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }));
 
     try {
-      const res = await fetch(`${API_BASE}/api/tasks/${taskId}/status`, {
+      const res = await fetch(`${API_BASE}/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: getAuthHeader(),
         body: JSON.stringify({ status: newStatus }),
@@ -447,7 +489,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         // Rollback on failure
         set({ tasks: prevTasks });
       } else {
-        const updated = await safeParseJson(res);
+        const dataRes = await safeParseJson(res);
+        const updated = dataRes?.task || dataRes;
         set((state) => ({
           tasks: state.tasks.map((t) => (t.id === taskId ? updated : t)),
         }));
@@ -470,7 +513,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to add comment");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.comment || dataRes;
     set((state) => ({
       tasks: state.tasks.map((t) => {
         if (t.id === taskId) {
@@ -507,7 +551,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ members: data, isLoadingMembers: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.members)
+          ? data.members
+          : [];
+        set({ members: list, isLoadingMembers: false });
       } else {
         set({ isLoadingMembers: false });
       }
@@ -526,7 +575,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ departments: data });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.departments)
+          ? data.departments
+          : [];
+        set({ departments: list });
       }
     } catch (err) {
       console.error("fetchDepartments error:", err);
@@ -550,7 +604,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   updateMemberRole: async (memberId, role, department) => {
-    const res = await fetch(`${API_BASE}/api/workspace-members/${memberId}`, {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${memberId}`, {
       method: "PATCH",
       headers: getAuthHeader(),
       body: JSON.stringify({ role, department }),
@@ -561,13 +617,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   removeMember: async (memberId) => {
-    const res = await fetch(`${API_BASE}/api/workspace-members/${memberId}`, {
+    const ws = get().activeWorkspace;
+    if (!ws) return;
+    const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/members/${memberId}`, {
       method: "DELETE",
       headers: getAuthHeader(),
     });
     if (res.ok) {
       set((state) => ({
-        members: state.members.filter((m) => m.id !== memberId),
+        members: state.members.filter((m) => m.id !== memberId && m.user_id !== memberId),
       }));
       get().fetchActivities();
     }
@@ -587,7 +645,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ announcements: data, isLoadingAnnouncements: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.announcements)
+          ? data.announcements
+          : [];
+        set({ announcements: list, isLoadingAnnouncements: false });
       } else {
         set({ isLoadingAnnouncements: false });
       }
@@ -598,7 +661,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createAnnouncement: async (title, content, priority) => {
-    const ws = get().activeWorkspace;
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
     if (!ws) throw new Error("No active workspace");
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/announcements`, {
       method: "POST",
@@ -609,7 +676,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create announcement");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.announcement || dataRes;
     set((state) => ({ announcements: [created, ...state.announcements] }));
     get().fetchActivities();
     return created;
@@ -629,7 +697,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ activities: data, isLoadingActivities: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.activities)
+          ? data.activities
+          : [];
+        set({ activities: list, isLoadingActivities: false });
       } else {
         set({ isLoadingActivities: false });
       }
@@ -653,7 +726,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ meetings: data, isLoadingMeetings: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.meetings)
+          ? data.meetings
+          : [];
+        set({ meetings: list, isLoadingMeetings: false });
       } else {
         set({ isLoadingMeetings: false });
       }
@@ -664,7 +742,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createMeeting: async (data) => {
-    const ws = get().activeWorkspace;
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
     if (!ws) throw new Error("No active workspace");
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/meetings`, {
       method: "POST",
@@ -675,7 +757,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create meeting");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.meeting || dataRes;
     set((state) => ({ meetings: [...state.meetings, created] }));
     get().fetchActivities();
     return created;
@@ -707,7 +790,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ notes: data, isLoadingNotes: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.notes)
+          ? data.notes
+          : [];
+        set({ notes: list, isLoadingNotes: false });
       } else {
         set({ isLoadingNotes: false });
       }
@@ -718,7 +806,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createNote: async (title, content, isPinned) => {
-    const ws = get().activeWorkspace;
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
     if (!ws) throw new Error("No active workspace");
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/notes`, {
       method: "POST",
@@ -729,7 +821,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to create note");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.note || dataRes;
     set((state) => ({ notes: [created, ...state.notes] }));
     return created;
   },
@@ -741,7 +834,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       body: JSON.stringify(data),
     });
     if (res.ok) {
-      const updated = await safeParseJson(res);
+      const dataRes = await safeParseJson(res);
+      const updated = dataRes?.note || dataRes;
       set((state) => ({
         notes: state.notes.map((n) => (n.id === id ? updated : n)),
       }));
@@ -774,7 +868,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ files: data, isLoadingFiles: false });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.files)
+          ? data.files
+          : [];
+        set({ files: list, isLoadingFiles: false });
       } else {
         set({ isLoadingFiles: false });
       }
@@ -785,7 +884,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 
   createFileEntry: async (name, fileType, sizeBytes, url, projectId) => {
-    const ws = get().activeWorkspace;
+    let ws = get().activeWorkspace;
+    if (!ws) {
+      await get().fetchWorkspaces();
+      ws = get().activeWorkspace;
+    }
     if (!ws) throw new Error("No active workspace");
     const res = await fetch(`${API_BASE}/api/workspaces/${ws.id}/files`, {
       method: "POST",
@@ -802,7 +905,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const err = await safeParseJson(res);
       throw new Error(err.error || "Failed to record file");
     }
-    const created = await safeParseJson(res);
+    const dataRes = await safeParseJson(res);
+    const created = dataRes?.file || dataRes;
     set((state) => ({ files: [created, ...state.files] }));
     get().fetchActivities();
     return created;
@@ -818,7 +922,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ notifications: data });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.notifications)
+          ? data.notifications
+          : [];
+        set({ notifications: list });
       }
     } catch (err) {
       console.error("fetchNotifications error:", err);
@@ -857,7 +966,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ savedItems: data });
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.saved_items)
+          ? data.saved_items
+          : [];
+        set({ savedItems: list });
       }
     } catch (err) {
       console.error("fetchSavedItems error:", err);
@@ -888,7 +1002,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         }),
       });
       if (res.ok) {
-        const created = await safeParseJson(res);
+        const dataRes = await safeParseJson(res);
+        const created = dataRes?.saved_item || dataRes;
         set((state) => ({ savedItems: [created, ...state.savedItems] }));
       }
     }
@@ -906,7 +1021,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       });
       if (res.ok) {
         const data = await safeParseJson(res);
-        set({ analytics: data });
+        set({ analytics: data?.analytics || data });
       }
     } catch (err) {
       console.error("fetchAnalytics error:", err);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useWorkspaceStore } from "../../store/workspaceStore.ts";
 import { TaskPriority, TaskStatus, SubtaskItem } from "../../../shared/types.ts";
 import {
@@ -10,6 +10,8 @@ import {
   Plus,
   Trash2,
   CheckSquare,
+  Building2,
+  AlertCircle,
 } from "lucide-react";
 
 interface CreateTaskModalProps {
@@ -28,24 +30,20 @@ export default function CreateTaskModal({
     projects,
     members,
     activeProject,
+    activeWorkspace,
+    workspaces,
+    setActiveWorkspace,
+    fetchWorkspaces,
     taskModalPrefill,
     setTaskModalPrefill,
   } = useWorkspaceStore();
 
-  const [title, setTitle] = useState(taskModalPrefill?.title || "");
-  const [description, setDescription] = useState(taskModalPrefill?.description || "");
-  const [status, setStatus] = useState<TaskStatus>(
-    (taskModalPrefill?.status as TaskStatus) || defaultStatus
-  );
-  const [priority, setPriority] = useState<TaskPriority>(
-    (taskModalPrefill?.priority as TaskPriority) || "MEDIUM"
-  );
-  const [projectId, setProjectId] = useState<string>(
-    taskModalPrefill?.project_id || activeProject?.id || ""
-  );
-  const [assigneeId, setAssigneeId] = useState<string>(
-    taskModalPrefill?.assignee_id || ""
-  );
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<TaskStatus>(defaultStatus);
+  const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
+  const [projectId, setProjectId] = useState<string>("");
+  const [assigneeId, setAssigneeId] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
 
   // Subtasks
@@ -56,6 +54,28 @@ export default function CreateTaskModal({
   const [labels, setLabels] = useState<string[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Sync state with prefill or defaults when opened
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(taskModalPrefill?.title || "");
+      setDescription(taskModalPrefill?.description || "");
+      setStatus((taskModalPrefill?.status as TaskStatus) || defaultStatus);
+      setPriority((taskModalPrefill?.priority as TaskPriority) || "MEDIUM");
+      setProjectId(taskModalPrefill?.project_id || activeProject?.id || "");
+      setAssigneeId(taskModalPrefill?.assignee_id || "");
+      setDueDate("");
+      setSubtasks([]);
+      setLabels([]);
+      setErrorMessage(null);
+
+      // Ensure workspaces are loaded if none active
+      if (!activeWorkspace) {
+        fetchWorkspaces();
+      }
+    }
+  }, [isOpen, taskModalPrefill, activeProject, defaultStatus, activeWorkspace, fetchWorkspaces]);
 
   if (!isOpen) return null;
 
@@ -64,6 +84,7 @@ export default function CreateTaskModal({
     if (!title.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
       await createTask({
         title: title.trim(),
@@ -78,8 +99,9 @@ export default function CreateTaskModal({
       });
       setTaskModalPrefill(null);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to create task:", err);
+      setErrorMessage(err?.message || "Failed to create task. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -111,10 +133,45 @@ export default function CreateTaskModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 overflow-y-auto">
       <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden my-8">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
-          <h2 className="text-base font-semibold text-slate-100 flex items-center space-x-2">
-            <CheckSquare className="h-5 w-5 text-brand-400" />
-            <span>Create New Task</span>
-          </h2>
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+              <CheckSquare className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-100 flex items-center space-x-2">
+                <span>Create New Task</span>
+              </h2>
+              {workspaces.length > 1 ? (
+                <div className="flex items-center space-x-1.5 mt-0.5">
+                  <Building2 className="h-3 w-3 text-slate-500" />
+                  <span className="text-[11px] text-slate-400">Workspace:</span>
+                  <select
+                    value={activeWorkspace?.id || ""}
+                    onChange={(e) => {
+                      const ws = workspaces.find((w) => w.id === e.target.value);
+                      if (ws) setActiveWorkspace(ws);
+                    }}
+                    className="bg-slate-800 border border-slate-700/60 rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-200 focus:outline-none focus:border-brand-500 cursor-pointer"
+                  >
+                    {workspaces.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : activeWorkspace ? (
+                <p className="text-[11px] text-slate-400 mt-0.5 flex items-center space-x-1">
+                  <Building2 className="h-3 w-3 text-slate-500" />
+                  <span>Workspace: <strong className="text-slate-300 font-medium">{activeWorkspace.name}</strong></span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-brand-400 mt-0.5">
+                  Initializing collaboration workspace...
+                </p>
+              )}
+            </div>
+          </div>
           <button
             onClick={() => {
               setTaskModalPrefill(null);
@@ -127,6 +184,22 @@ export default function CreateTaskModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {errorMessage && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="text-rose-400 hover:text-rose-200 transition cursor-pointer p-0.5"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-xs font-medium text-slate-400 uppercase tracking-wider mb-1.5">

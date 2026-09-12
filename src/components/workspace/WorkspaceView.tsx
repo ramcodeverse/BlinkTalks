@@ -12,7 +12,6 @@ import AnnouncementsView from "./AnnouncementsView.tsx";
 import NotesDocsView from "./NotesDocsView.tsx";
 import AnalyticsView from "./AnalyticsView.tsx";
 import WorkspaceModal from "./WorkspaceModal.tsx";
-import CreateTaskModal from "./CreateTaskModal.tsx";
 import CreateProjectModal from "./CreateProjectModal.tsx";
 import ScheduleMeetingModal from "./ScheduleMeetingModal.tsx";
 import CreateAnnouncementModal from "./CreateAnnouncementModal.tsx";
@@ -88,10 +87,6 @@ export default function WorkspaceView({
       />
 
       {/* Quick Create Modals */}
-      <CreateTaskModal
-        isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
-      />
       <CreateProjectModal
         isOpen={isProjectModalOpen}
         onClose={() => setIsProjectModalOpen(false)}

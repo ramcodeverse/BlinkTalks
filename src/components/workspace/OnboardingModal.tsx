@@ -34,16 +34,21 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
   if (!isOpen) return null;
 
   const handleNext = async () => {
-    if (currentStep === 4 && projectName.trim()) {
-      await createProject({ name: projectName.trim(), color: "#3b82f6" });
-    } else if (currentStep === 5 && taskTitle.trim()) {
-      await createTask({ title: taskTitle.trim(), priority: "HIGH" });
-      addToast("Workspace setup complete! Welcome to BlinkTalks.", "success");
-      onClose();
-      return;
-    }
+    try {
+      if (currentStep === 4 && projectName.trim()) {
+        await createProject({ name: projectName.trim(), color: "#3b82f6" });
+      } else if (currentStep === 5 && taskTitle.trim()) {
+        await createTask({ title: taskTitle.trim(), priority: "HIGH" });
+        addToast("Workspace setup complete! Welcome to BlinkTalks.", "success");
+        onClose();
+        return;
+      }
 
-    setCurrentStep((prev) => Math.min(5, prev + 1));
+      setCurrentStep((prev) => Math.min(5, prev + 1));
+    } catch (err: any) {
+      console.error("Onboarding setup step error:", err);
+      addToast(err?.message || "Failed to complete onboarding step", "error");
+    }
   };
 
   const handlePrev = () => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useChatStore, API_BASE } from "../store/chatStore.ts";
+import { useWorkspaceStore } from "../store/workspaceStore.ts";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Send,
@@ -22,6 +23,10 @@ import {
   Edit2,
   Smile,
   ArrowLeft,
+  CheckSquare,
+  Plus,
+  ChevronRight,
+  Briefcase,
 } from "lucide-react";
 import GroupDetailsSidebar from "./GroupDetailsSidebar.tsx";
 
@@ -89,7 +94,18 @@ export default function ChatArea() {
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
   const [newMessagesCount, setNewMessagesCount] = useState(0);
   const [showGroupSidebar, setShowGroupSidebar] = useState(false);
+  const [showRelatedWork, setShowRelatedWork] = useState(false);
   const [isScrolledUp, setIsScrolledUp] = useState(false);
+
+  // Workspace integration hooks
+  const {
+    activeWorkspace,
+    tasks,
+    setIsTaskModalOpen,
+    setTaskModalPrefill,
+    setActiveTask,
+    moveTaskStatus,
+  } = useWorkspaceStore();
 
   // In-conversation message search
   const [showMsgSearch, setShowMsgSearch] = useState(false);
@@ -514,8 +530,22 @@ export default function ChatArea() {
             </div>
           </div>
 
-          {/* Right Header Actions: Search in conversation, Group info, Contact toggles */}
+          {/* Right Header Actions: Search in conversation, Group info, Contact toggles, Workspace Tasks */}
           <div className="flex items-center space-x-2 ml-3">
+            {/* Workspace Tasks Split Panel Toggle */}
+            <button
+              onClick={() => setShowRelatedWork(!showRelatedWork)}
+              title="Toggle Related Workspace Tasks"
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                showRelatedWork
+                  ? "bg-brand-600/20 border-brand-500/50 text-cyan-300 shadow-sm"
+                  : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800"
+              }`}
+            >
+              <CheckSquare className="h-3.5 w-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Workspace Work</span>
+            </button>
+
             {/* Search in chat toggle */}
             <button
               onClick={() => {
@@ -894,6 +924,24 @@ export default function ChatArea() {
                                   )}
                                 </button>
 
+                                {/* Turn into Task Button */}
+                                <button
+                                  onClick={() => {
+                                    const clean = msg.content.startsWith("> Replying to @")
+                                      ? msg.content.split("\n\n").slice(1).join("\n\n")
+                                      : msg.content;
+                                    setTaskModalPrefill({
+                                      title: clean.length > 70 ? clean.slice(0, 70) + "..." : clean,
+                                      description: `Created from message by @${msg.sender_name || msg.sender_username}:\n"${clean}"`,
+                                    });
+                                    setIsTaskModalOpen(true);
+                                  }}
+                                  className="p-1.5 text-slate-400 hover:text-cyan-300 rounded-lg hover:bg-cyan-500/10 transition cursor-pointer"
+                                  title="Turn into Task"
+                                >
+                                  <CheckSquare className="h-3.5 w-3.5" />
+                                </button>
+
                                 {/* Edit Button for own messages */}
                                 {isMyMessage && (
                                   <button
@@ -1112,6 +1160,122 @@ export default function ChatArea() {
           conversation={activeConv}
           onClose={() => setShowGroupSidebar(false)}
         />
+      )}
+
+      {/* Related Workspace Work Split Side Panel */}
+      {showRelatedWork && (
+        <div className="w-80 border-l border-slate-800 bg-slate-900/95 flex flex-col h-full z-20 shrink-0 shadow-2xl animate-fade-in select-none">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="h-7 w-7 rounded-lg bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+                <CheckSquare className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-display font-semibold text-xs text-white">Workspace Tasks</h4>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {activeWorkspace ? activeWorkspace.name : "Active Workspace"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowRelatedWork(false)}
+              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="p-3 border-b border-slate-800/80 bg-slate-950/40">
+            <button
+              onClick={() => {
+                setTaskModalPrefill(null);
+                setIsTaskModalOpen(true);
+              }}
+              className="btn-interactive w-full py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-medium text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-brand-500/20 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Create New Task</span>
+            </button>
+            <p className="text-[10px] text-slate-400 text-center mt-2 leading-tight">
+              Hover any message and tap <CheckSquare className="h-3 w-3 inline text-cyan-400 mx-0.5" /> to convert it into a task.
+            </p>
+          </div>
+
+          {/* Tasks List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+            {tasks.length === 0 ? (
+              <div className="text-center py-12 px-4 space-y-2">
+                <CheckSquare className="h-8 w-8 text-slate-700 mx-auto" />
+                <p className="text-xs text-slate-400 font-medium">No tasks recorded</p>
+                <p className="text-[10px] text-slate-500">Turn conversation discussions into tasks to track them here and across the team Kanban.</p>
+              </div>
+            ) : (
+              tasks.slice(0, 15).map((task) => {
+                const isCompleted = task.status === "COMPLETED";
+                const isReview = task.status === "IN_REVIEW";
+                const isInProgress = task.status === "IN_PROGRESS";
+                
+                return (
+                  <div
+                    key={task.id}
+                    className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-slate-700 space-y-2 transition shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <h5 className={`text-xs font-medium text-slate-200 leading-snug line-clamp-2 ${isCompleted ? "line-through text-slate-500" : ""}`}>
+                        {task.title}
+                      </h5>
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold shrink-0 ${
+                          task.priority === "URGENT" || task.priority === "HIGH"
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                            : task.priority === "MEDIUM"
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/50">
+                      <span
+                        className={`font-semibold ${
+                          isCompleted
+                            ? "text-emerald-400"
+                            : isReview
+                            ? "text-purple-400"
+                            : isInProgress
+                            ? "text-blue-400"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {task.status.replace("_", " ")}
+                      </span>
+
+                      <div className="flex items-center space-x-1">
+                        {!isCompleted && (
+                          <button
+                            onClick={() => moveTaskStatus(task.id, isReview ? "COMPLETED" : "IN_REVIEW")}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer text-[9px]"
+                          >
+                            {isReview ? "Mark Done" : "Move to Review"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setActiveTask(task)}
+                          className="p-1 text-slate-500 hover:text-slate-300 transition cursor-pointer"
+                          title="View Details"
+                        >
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

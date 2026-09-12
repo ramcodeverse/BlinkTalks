@@ -1,6 +1,6 @@
 {
   "name": "BlinkTalks",
-  "description": "A portfolio-grade, production-quality real-time chat application modeled on Telegram's identity and discovery model.",
+  "description": "A modern real-time communication and collaboration platform uniting encrypted messaging, team workspaces, tasks, Kanban boards, and documents.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
